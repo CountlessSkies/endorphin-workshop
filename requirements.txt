@@ -1,0 +1,6 @@
+transformers>=4.45.0
+accelerate>=1.0.0
+bitsandbytes>=0.46.1
+torch>=2.0.0
+numpy
+pillow
