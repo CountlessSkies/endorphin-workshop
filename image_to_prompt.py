@@ -170,7 +170,7 @@ class EndorphinImageToPrompt:
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("prompt",)
     FUNCTION = "generate_prompt"
-    CATEGORY = "endorphin-workshop"
+    CATEGORY = "Endorphin Workshop/Utilities"
 
     def tensor_to_pil(self, tensor):
         if tensor is None:

@@ -14,3 +14,6 @@ Uses a locally-stored Qwen-VL model (e.g. Qwen2.5-VL-3B-Instruct) to describe an
 * **max_tokens**: Maximum length of generated text.
 * **keep_model_loaded**: If enabled, keeps the model in memory across runs for faster subsequent generations.
 * **image** (Optional): Input ComfyUI image.
+
+### Endorphin Switch Case (20)
+Routes one of 20 optional inputs to `value`. Set **select** to the desired case number (1–20); connect only the cases your workflow needs. The node accepts and returns any ComfyUI data type.

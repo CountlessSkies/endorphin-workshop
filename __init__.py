@@ -6,7 +6,20 @@ current_dir = Path(__file__).parent
 if str(current_dir) not in sys.path:
     sys.path.insert(0, str(current_dir))
 
-from .image_to_prompt import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+from .image_to_prompt import NODE_CLASS_MAPPINGS as IMAGE_TO_PROMPT_MAPPINGS
+from .image_to_prompt import NODE_DISPLAY_NAME_MAPPINGS as IMAGE_TO_PROMPT_DISPLAY_NAMES
+from .switch_case import NODE_CLASS_MAPPINGS as SWITCH_CASE_MAPPINGS
+from .switch_case import NODE_DISPLAY_NAME_MAPPINGS as SWITCH_CASE_DISPLAY_NAMES
+
+NODE_CLASS_MAPPINGS = {
+    **IMAGE_TO_PROMPT_MAPPINGS,
+    **SWITCH_CASE_MAPPINGS,
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    **IMAGE_TO_PROMPT_DISPLAY_NAMES,
+    **SWITCH_CASE_DISPLAY_NAMES,
+}
 
 # Export JS directory for frontend extensions
 WEB_DIRECTORY = "./js"
