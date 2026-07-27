@@ -17,3 +17,6 @@ Uses a locally-stored Qwen-VL model (e.g. Qwen2.5-VL-3B-Instruct) to describe an
 
 ### Endorphin Switch Case (20)
 Routes one of 20 optional inputs to `value`. Set **select** to the desired case number (1–20); connect only the cases your workflow needs. The node accepts and returns any ComfyUI data type.
+
+### Endorphin Text Lines (20)
+Splits multiline text into 20 string outputs (`line_01` through `line_20`). Empty lines are ignored and unused outputs are empty strings. Connect its outputs directly to matching cases on **Endorphin Switch Case (20)**.
