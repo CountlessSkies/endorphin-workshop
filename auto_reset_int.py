@@ -1,5 +1,5 @@
 class EndorphinAutoResetInt:
-    """An integer value that the frontend resets to 1 after execution."""
+    """An integer with After Generate controls and a queue-end reset value."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -10,7 +10,19 @@ class EndorphinAutoResetInt:
                     "min": 0,
                     "max": 0xFFFFFFFFFFFFFFFF,
                     "step": 1,
-                    "tooltip": "Outputs this integer, then resets to 1 after the queue finishes this node.",
+                    "control_after_generate": True,
+                    "tooltip": "Use the After Generate control to keep, increment, decrement, or randomize the value after a run.",
+                }),
+                "reset_value": ("INT", {
+                    "default": 1,
+                    "min": 0,
+                    "max": 0xFFFFFFFFFFFFFFFF,
+                    "step": 1,
+                    "tooltip": "Value restored immediately after the queue has been submitted.",
+                }),
+                "reset_after_batch": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Restore value to reset_value immediately after the queue is submitted.",
                 }),
             },
         }
@@ -20,7 +32,7 @@ class EndorphinAutoResetInt:
     FUNCTION = "get_value"
     CATEGORY = "Endorphin Workshop/Utilities"
 
-    def get_value(self, value):
+    def get_value(self, value, reset_value, reset_after_batch):
         return (value,)
 
 
