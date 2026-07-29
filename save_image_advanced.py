@@ -117,7 +117,7 @@ class EndorphinSaveImageAdvanced:
             pil_image = Image.fromarray(array)
 
             current_filename = filename.replace("%batch_num%", str(batch_number))
-            file_name = f"{current_filename}_{counter:05}_.{file_format}"
+            file_name = f"{current_filename}_{counter:05}.{file_format}"
             file_path = os.path.join(full_output_folder, file_name)
 
             if file_format == "png":
