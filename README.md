@@ -21,6 +21,9 @@ Routes one of 20 optional inputs to `value`. Set **select** to the desired case 
 ### Endorphin Text Lines (20)
 Splits multiline text into 20 string outputs (`line_01` through `line_20`). Empty lines are ignored and unused outputs are empty strings. Connect its outputs directly to matching cases on **Endorphin Switch Case (20)**.
 
+### Endorphin Concatenate Text (3)
+Concatenates `string_a`, `string_b`, and `string_c` in that order. Use **delimiter** to place text between each input (for example, a space, comma, or newline).
+
 ### Endorphin Auto Reset Int
 An `INT` node with a default value of `1`. Its **After Generate** control supports Fixed Value, Increment Value, Decrement Value, and Randomize Value. Once the requested queue has been submitted, `value` is restored to the selected `reset_value` (default: `1`) without waiting for generation to finish.
 
