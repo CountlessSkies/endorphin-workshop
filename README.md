@@ -20,3 +20,6 @@ Routes one of 20 optional inputs to `value`. Set **select** to the desired case 
 
 ### Endorphin Text Lines (20)
 Splits multiline text into 20 string outputs (`line_01` through `line_20`). Empty lines are ignored and unused outputs are empty strings. Connect its outputs directly to matching cases on **Endorphin Switch Case (20)**.
+
+### Endorphin Auto Reset Int
+An `INT` node with a default value of `1`. It outputs the current value and resets its widget to `1` after execution, ready for the next queue.
