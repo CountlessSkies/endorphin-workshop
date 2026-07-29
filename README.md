@@ -23,3 +23,6 @@ Splits multiline text into 20 string outputs (`line_01` through `line_20`). Empt
 
 ### Endorphin Auto Reset Int
 An `INT` node with a default value of `1`. Its **After Generate** control supports Fixed Value, Increment Value, Decrement Value, and Randomize Value. Once the requested queue has been submitted, `value` is restored to the selected `reset_value` (default: `1`) without waiting for generation to finish.
+
+### Endorphin Save Image Advanced
+Saves images as PNG, JPEG, or WEBP with configurable quality. Choose an existing subfolder in `ComfyUI/output`, or enter an absolute `custom_output_folder` such as `D:\Images\Job_01` to save outside ComfyUI.
