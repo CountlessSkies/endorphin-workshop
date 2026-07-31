@@ -11,6 +11,7 @@ function setWidgetValue(widget, value) {
 
 function advanceCounter(node) {
     if (node.comfyClass !== "EndorphinCartesianProduct") return;
+    if (!getWidget(node, "auto_increment")?.value) return;
 
     const dimensions = getWidget(node, "dimensions")?.value;
     const max1 = getWidget(node, "max_value_1")?.value;
@@ -49,6 +50,34 @@ function advanceCounter(node) {
     node.graph?.setDirtyCanvas(true, true);
 }
 
+function captureValuesBeforeQueue() {
+    const values = new Map();
+    for (const node of app.graph?._nodes ?? []) {
+        if (node.comfyClass !== "EndorphinCartesianProduct") continue;
+        const value1 = getWidget(node, "value_1");
+        const value2 = getWidget(node, "value_2");
+        const value3 = getWidget(node, "value_3");
+        if (!value1 || !value2 || !value3) continue;
+        values.set(node.id, [value1.value, value2.value, value3.value]);
+    }
+    return values;
+}
+
+function restoreValuesAfterQueueSubmission(valuesBeforeQueue) {
+    for (const [nodeId, values] of valuesBeforeQueue) {
+        const node = app.graph?.getNodeById(nodeId);
+        if (!node) continue;
+        const value1 = getWidget(node, "value_1");
+        const value2 = getWidget(node, "value_2");
+        const value3 = getWidget(node, "value_3");
+        if (!value1 || !value2 || !value3) continue;
+        setWidgetValue(value1, values[0]);
+        setWidgetValue(value2, values[1]);
+        setWidgetValue(value3, values[2]);
+        node.graph?.setDirtyCanvas(true, true);
+    }
+}
+
 app.registerExtension({
     name: "endorphin.CartesianProduct",
     setup() {
@@ -59,6 +88,14 @@ app.registerExtension({
             // after the current values have been serialized into that prompt.
             for (const node of app.graph?._nodes ?? []) advanceCounter(node);
             return prompt;
+        };
+
+        const originalQueuePrompt = app.queuePrompt;
+        app.queuePrompt = async function () {
+            const valuesBeforeQueue = captureValuesBeforeQueue();
+            const result = await originalQueuePrompt.apply(this, arguments);
+            restoreValuesAfterQueueSubmission(valuesBeforeQueue);
+            return result;
         };
     },
 });

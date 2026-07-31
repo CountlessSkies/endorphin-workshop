@@ -27,6 +27,10 @@ class EndorphinCartesianProduct:
                     "step": 1,
                     "tooltip": "Used only in 3D mode.",
                 }),
+                "auto_increment": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Advance to the next combination after every Queue Prompt batch item.",
+                }),
             },
         }
 
@@ -35,7 +39,7 @@ class EndorphinCartesianProduct:
     FUNCTION = "get_values"
     CATEGORY = "Endorphin Workshop/Utilities"
 
-    def get_values(self, dimensions, max_value_1, max_value_2, max_value_3, value_1, value_2, value_3):
+    def get_values(self, dimensions, max_value_1, max_value_2, max_value_3, value_1, value_2, value_3, auto_increment):
         return (value_1, value_2, value_3 if dimensions == "3D (triples)" else 0)
 
 
