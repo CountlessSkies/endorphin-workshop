@@ -44,6 +44,29 @@ def resolve_output_folder(selected_folder, custom_folder):
     return candidate, relative.as_posix()
 
 
+def append_subfolder(base_folder, subfolder):
+    """Append a relative save subfolder without allowing traversal outside base."""
+    base = Path(base_folder).resolve()
+    if not subfolder or not subfolder.strip():
+        return base
+    requested = Path(subfolder.strip())
+    if requested.is_absolute():
+        raise ValueError("Subfolder must be a relative path.")
+    destination = (base / requested).resolve()
+    try:
+        destination.relative_to(base)
+    except ValueError as error:
+        raise ValueError("Subfolder must stay inside the selected output folder.") from error
+    return destination
+
+
+def append_numbered_subfolder(base_folder, subfolder, subfolder_number, subfolder_digits):
+    destination = append_subfolder(base_folder, subfolder)
+    if subfolder_number == 0:
+        return destination
+    return append_subfolder(destination, f"{subfolder_number:0{subfolder_digits}d}")
+
+
 class EndorphinSaveImageAdvanced:
     @classmethod
     def INPUT_TYPES(cls):
@@ -63,7 +86,25 @@ class EndorphinSaveImageAdvanced:
                     "placeholder": "Optional path, e.g. D:\\Images\\Job_01",
                     "tooltip": "Optional. Overrides Output Folder. Absolute paths may be outside ComfyUI/output.",
                 }),
+                "subfolder": ("STRING", {
+                    "default": "",
+                    "placeholder": "Optional subfolder, e.g. job_01/selected",
+                    "tooltip": "Optional relative subfolder inside the selected output folder.",
+                }),
+                "subfolder_number": ("INT", {"default": 0, "min": 0, "max": 1000000000, "step": 1, "tooltip": "Optional numeric subfolder. Set 0 to disable."}),
+                "subfolder_digits": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Digits for numeric subfolder: 3 makes 001."}),
                 "file_format": (["png", "jpeg", "webp"], {"default": "png"}),
+                "suffix_digits": ("INT", {
+                    "default": 3,
+                    "min": 1,
+                    "max": 12,
+                    "step": 1,
+                    "tooltip": "Number of digits in the numeric suffix. Use 2 for 01, 02; use 5 for 00001, 00002.",
+                }),
+                "overwrite": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": "Save without a numeric suffix and overwrite an existing file with the same name.",
+                }),
                 "quality": ("INT", {
                     "default": 95,
                     "min": 1,
@@ -96,13 +137,19 @@ class EndorphinSaveImageAdvanced:
         filename_prefix="ComfyUI",
         output_folder="(output root)",
         custom_output_folder="",
+        subfolder="",
+        subfolder_number=0,
+        subfolder_digits=3,
         file_format="png",
+        suffix_digits=3,
+        overwrite=False,
         quality=95,
         png_compress_level=4,
         prompt=None,
         extra_pnginfo=None,
     ):
-        output_dir, subfolder = resolve_output_folder(output_folder, custom_output_folder)
+        output_dir, _ = resolve_output_folder(output_folder, custom_output_folder)
+        output_dir = append_numbered_subfolder(output_dir, subfolder, subfolder_number, subfolder_digits)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         full_output_folder, filename, counter, _, _ = folder_paths.get_save_image_path(
@@ -111,13 +158,16 @@ class EndorphinSaveImageAdvanced:
             images[0].shape[1],
             images[0].shape[0],
         )
-        results = []
         for batch_number, image in enumerate(images):
             array = np.clip(255.0 * image.cpu().numpy(), 0, 255).astype(np.uint8)
             pil_image = Image.fromarray(array)
 
             current_filename = filename.replace("%batch_num%", str(batch_number))
-            file_name = f"{current_filename}_{counter:05}.{file_format}"
+            file_name = (
+                f"{current_filename}.{file_format}"
+                if overwrite
+                else f"{current_filename}_{counter:0{suffix_digits}d}.{file_format}"
+            )
             file_path = os.path.join(full_output_folder, file_name)
 
             if file_format == "png":
@@ -133,14 +183,11 @@ class EndorphinSaveImageAdvanced:
             else:
                 pil_image.save(file_path, format="WEBP", quality=quality)
 
-            results.append({
-                "filename": file_name,
-                "subfolder": subfolder,
-                "type": "output",
-            })
             counter += 1
 
-        return {"ui": {"images": results}, "result": (images,)}
+        # Keep the IMAGE output available to downstream nodes without adding
+        # ComfyUI's image-thumbnail preview to this save node.
+        return {"result": (images,)}
 
 
 NODE_CLASS_MAPPINGS = {

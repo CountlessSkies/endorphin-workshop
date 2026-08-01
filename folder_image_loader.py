@@ -13,8 +13,31 @@ def natural_sort_key(path):
     return [int(part) if part.isdigit() else part.casefold() for part in re.split(r"(\d+)", path.name)]
 
 
-def get_image_files(folder_path, sort_mode):
-    folder = Path(folder_path).expanduser().resolve()
+def resolve_subfolder(base_folder, subfolder):
+    """Append a relative subfolder without allowing paths outside the base."""
+    base = Path(base_folder).expanduser().resolve()
+    if not subfolder or not subfolder.strip():
+        return base
+    requested = Path(subfolder.strip())
+    if requested.is_absolute():
+        raise ValueError("Subfolder must be a relative path.")
+    folder = (base / requested).resolve()
+    try:
+        folder.relative_to(base)
+    except ValueError as error:
+        raise ValueError("Subfolder must stay inside Folder Path.") from error
+    return folder
+
+
+def resolve_numbered_subfolder(base_folder, subfolder, subfolder_number, subfolder_digits):
+    folder = resolve_subfolder(base_folder, subfolder)
+    if subfolder_number == 0:
+        return folder
+    return resolve_subfolder(folder, f"{subfolder_number:0{subfolder_digits}d}")
+
+
+def get_image_files(folder_path, subfolder, sort_mode):
+    folder = resolve_subfolder(folder_path, subfolder)
     if not folder.is_dir():
         raise ValueError(f"Image folder was not found: {folder}")
 
@@ -47,6 +70,13 @@ class EndorphinFolderImageLoader:
                     "placeholder": "D:\\Images\\source_folder",
                     "tooltip": "Absolute path to a folder containing images.",
                 }),
+                "subfolder": ("STRING", {
+                    "default": "",
+                    "placeholder": "Optional subfolder, e.g. set_a/red",
+                    "tooltip": "Optional relative subfolder inside Folder Path.",
+                }),
+                "subfolder_number": ("INT", {"default": 0, "min": 0, "max": 1000000000, "step": 1, "tooltip": "Optional numeric subfolder. Set 0 to disable."}),
+                "subfolder_digits": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Digits for numeric subfolder: 3 makes 001."}),
                 "sort": ([
                     "Natural (1, 2, 10)",
                     "Name (A-Z)",
@@ -77,8 +107,9 @@ class EndorphinFolderImageLoader:
     FUNCTION = "load_image"
     CATEGORY = "Endorphin Workshop/Utilities"
 
-    def load_image(self, folder_path, sort, image_index, auto_increment, loop):
-        files = get_image_files(folder_path, sort)
+    def load_image(self, folder_path, subfolder, subfolder_number, subfolder_digits, sort, image_index, auto_increment, loop):
+        folder = resolve_numbered_subfolder(folder_path, subfolder, subfolder_number, subfolder_digits)
+        files = get_image_files(folder, "", sort)
         index = (image_index - 1) % len(files) if loop else min(image_index - 1, len(files) - 1)
         file_path = files[index]
 

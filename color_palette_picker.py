@@ -25,8 +25,8 @@ class EndorphinColorPalettePicker:
             },
         }
 
-    RETURN_TYPES = ("INT",)
-    RETURN_NAMES = ("value",)
+    RETURN_TYPES = ("INT", "STRING", "STRING")
+    RETURN_NAMES = ("value", "color_name", "hex")
     FUNCTION = "get_selected_value"
     CATEGORY = "Endorphin Workshop/Utilities"
 
@@ -36,11 +36,16 @@ class EndorphinColorPalettePicker:
             colors = data.get("colors", [])
             selected = int(data.get("selected", 0))
             if not colors:
-                return (0,)
+                return (0, "", "")
             selected = max(0, min(selected, len(colors) - 1))
-            return (int(colors[selected].get("value", 0)),)
+            color = colors[selected]
+            return (
+                int(color.get("value", 0)),
+                str(color.get("name", "")),
+                str(color.get("hex", "")).upper(),
+            )
         except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
-            return (0,)
+            return (0, "", "")
 
 
 NODE_CLASS_MAPPINGS = {
