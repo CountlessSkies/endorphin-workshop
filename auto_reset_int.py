@@ -1,5 +1,5 @@
 class EndorphinAutoResetInt:
-    """An integer with After Generate controls and a queue-end reset value."""
+    """An integer that restores its pre-queue value after batch submission."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -10,19 +10,10 @@ class EndorphinAutoResetInt:
                     "min": 0,
                     "max": 0xFFFFFFFFFFFFFFFF,
                     "step": 1,
-                    "control_after_generate": True,
-                    "tooltip": "Use the After Generate control to keep, increment, decrement, or randomize the value after a run.",
                 }),
-                "reset_value": ("INT", {
-                    "default": 1,
-                    "min": 0,
-                    "max": 0xFFFFFFFFFFFFFFFF,
-                    "step": 1,
-                    "tooltip": "Value restored immediately after the queue has been submitted.",
-                }),
-                "reset_after_batch": ("BOOLEAN", {
+                "auto_increment": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "Restore value to reset_value immediately after the queue is submitted.",
+                    "tooltip": "Increase value by 1 for each Queue Prompt batch item.",
                 }),
             },
         }
@@ -32,7 +23,7 @@ class EndorphinAutoResetInt:
     FUNCTION = "get_value"
     CATEGORY = "Endorphin Workshop/Utilities"
 
-    def get_value(self, value, reset_value, reset_after_batch):
+    def get_value(self, value, auto_increment):
         return (value,)
 
 

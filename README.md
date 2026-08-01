@@ -25,7 +25,7 @@ Splits multiline text into 20 string outputs (`line_01` through `line_20`). Empt
 Concatenates `string_a`, `string_b`, and `string_c` in that order. Use **delimiter** to place text between each input (for example, a space, comma, or newline).
 
 ### Endorphin Auto Reset Int
-An `INT` node with a default value of `1`. Its **After Generate** control supports Fixed Value, Increment Value, Decrement Value, and Randomize Value. Once the requested queue has been submitted, `value` is restored to the selected `reset_value` (default: `1`) without waiting for generation to finish.
+An `INT` node with a default value of `1`. Enable **auto_increment** to increase `value` by one for each Queue Prompt batch item; disable it to keep the value fixed. Once the requested queue has been submitted, `value` is restored to the value that was present before queueing, without waiting for generation to finish.
 
 ### Endorphin Save Image Advanced
 Saves images as PNG, JPEG, or WEBP with configurable quality. Choose an existing subfolder in `ComfyUI/output`, or enter an absolute `custom_output_folder` such as `D:\Images\Job_01` to save outside ComfyUI.
@@ -38,3 +38,6 @@ Loads one text value from a selected CSV column per Queue Prompt batch item. Use
 
 ### Endorphin Folder Image Loader
 Loads one image per Queue Prompt batch from an absolute folder path. Outputs the full filename and filename without extension. Sort by natural filename order, name, or modification time; turn off `auto_increment` to reuse the current image. The image index is restored after the requested queue has been submitted.
+
+### Endorphin Color Palette Picker
+Creates a flexible color palette directly in the node. Click a swatch to choose the active color, click its colored square to use a visual color picker, or use the pencil to enter its name, `#RRGGBB` HEX code, and integer output. Use **+ Add Color** to create more slots, or **Paste List** to import lines such as `mocha taupe (hex #977D67)`; add `= 10` to choose an integer other than the automatic sequence. The node resizes automatically and outputs the integer assigned to the selected color.
