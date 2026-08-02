@@ -21,8 +21,8 @@ def get_selected_asset_folder(count, index, values):
 
 
 class EndorphinEtsyListingImageLoader(EndorphinFolderImageLoader):
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "INT")
-    RETURN_NAMES = ("image", "file_name", "file_name_no_ext", "image_number")
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "INT", "STRING", "INT")
+    RETURN_NAMES = ("image", "file_name", "file_name_no_ext", "image_index", "asset_folder", "asset_folder_index")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -32,9 +32,10 @@ class EndorphinEtsyListingImageLoader(EndorphinFolderImageLoader):
         return {"required": {"project_root": ("STRING", {"default": r"G:\My Drive\_Etsy\_Listing"}), "listing_number": ("INT", {"default": 1, "min": 1, "max": 999999}), "asset_folder_count": ("INT", {"default": 3, "min": 1, "max": MAX_ASSET_FOLDERS}), "asset_folder_index": ("INT", {"default": 1, "min": 1, "max": MAX_ASSET_FOLDERS}), **asset_folder_inputs(), **data}}
 
     def load_image(self, project_root, listing_number, asset_folder_count, asset_folder_index, sort, image_index, auto_increment, loop, **kwargs):
-        path = Path(project_root) / f"{listing_number:03d}" / get_selected_asset_folder(asset_folder_count, asset_folder_index, kwargs)
+        asset_folder = get_selected_asset_folder(asset_folder_count, asset_folder_index, kwargs)
+        path = Path(project_root) / f"{listing_number:03d}" / asset_folder
         image, _mask, file_name, file_name_no_ext, number = super().load_image(str(path), "", sort, image_index, auto_increment, loop)
-        return image, file_name, file_name_no_ext, number
+        return image, file_name, file_name_no_ext, number, asset_folder, asset_folder_index
 
     @classmethod
     def IS_CHANGED(cls, project_root, listing_number, asset_folder_count, asset_folder_index, sort, image_index, auto_increment, loop, **kwargs):
