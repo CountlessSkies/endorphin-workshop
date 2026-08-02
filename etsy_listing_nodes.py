@@ -7,7 +7,7 @@ MAX_ASSET_FOLDERS = 20
 
 
 def asset_folder_inputs():
-    defaults = ["original", "creative", "colors"]
+    defaults = ["01_originals", "02_creatives", "03_colors"]
     return {f"asset_folder_{index:02d}": ("STRING", {"default": defaults[index - 1] if index <= 3 else ""}) for index in range(1, MAX_ASSET_FOLDERS + 1)}
 
 
@@ -29,7 +29,7 @@ class EndorphinEtsyListingImageLoader(EndorphinFolderImageLoader):
         data = EndorphinFolderImageLoader.INPUT_TYPES()["required"].copy()
         data.pop("folder_path")
         data.pop("subfolder")
-        return {"required": {"project_root": ("STRING", {"default": r"G:\My Drive\_Etsy\_Listing"}), "listing_number": ("INT", {"default": 1, "min": 1, "max": 999999}), "asset_folder_count": ("INT", {"default": 3, "min": 1, "max": MAX_ASSET_FOLDERS}), "asset_folder_index": ("INT", {"default": 1, "min": 1, "max": MAX_ASSET_FOLDERS}), **asset_folder_inputs(), **data}}
+        return {"required": {"project_root": ("STRING", {"default": r"G:\My Drive\_Etsy\_Listing"}), "listing_number": ("INT", {"default": 1, "min": 1, "max": 999999, "step": 1}), "asset_folder_count": ("INT", {"default": 3, "min": 1, "max": MAX_ASSET_FOLDERS, "step": 1}), "asset_folder_index": ("INT", {"default": 1, "min": 1, "max": MAX_ASSET_FOLDERS, "step": 1}), **asset_folder_inputs(), **data}}
 
     def load_image(self, project_root, listing_number, asset_folder_count, asset_folder_index, sort, image_index, auto_increment, loop, **kwargs):
         asset_folder = get_selected_asset_folder(asset_folder_count, asset_folder_index, kwargs)

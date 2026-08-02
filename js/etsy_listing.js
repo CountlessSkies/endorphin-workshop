@@ -22,7 +22,7 @@ function installPalette(node, prefix, itemLabel) {
     const setWidgetValue = (widget, value) => {
         if (!widget) return;
         widget.value = value;
-        widget.callback?.(value);
+        node.graph?.setDirtyCanvas(true, true);
     };
     const render = () => {
         root.replaceChildren();
@@ -76,8 +76,9 @@ function installPalette(node, prefix, itemLabel) {
         root.append(add);
     };
 
-    node.widgets = node.widgets.filter(w => !fieldPattern.test(w.name));
     for (const widget of all.filter(w => fieldPattern.test(w.name))) {
+        widget.hidden = true;
+        widget.options.hidden = true;
         const callback = widget.callback;
         widget.callback = function(value) { const result = callback?.apply(this, arguments); render(); return result; };
     }

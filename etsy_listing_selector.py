@@ -15,10 +15,14 @@ def design_phase_inputs():
 def get_selected_design_phase(count, index, values):
     if index > count:
         raise ValueError("design_phase_index must not be higher than design_phase_count.")
-    phase = values.get(f"design_phase_{index:02d}", "").strip()
-    if not phase:
-        raise ValueError("Choose a valid design phase name.")
-    return phase
+    phase = values.get(f"design_phase_{index:02d}")
+    if isinstance(phase, str) and phase.strip():
+        return phase.strip()
+
+    # Older workflows may not contain the hidden phase widgets yet. Keep them
+    # executable while the frontend writes the values back on the next save.
+    defaults = ["redesign", "colorway"]
+    return defaults[index - 1] if index <= len(defaults) else f"phase_{index:02d}"
 
 
 class EndorphinEtsyListingSelector:
