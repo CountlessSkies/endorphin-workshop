@@ -60,13 +60,6 @@ def append_subfolder(base_folder, subfolder):
     return destination
 
 
-def append_numbered_subfolder(base_folder, subfolder, subfolder_number, subfolder_digits):
-    destination = append_subfolder(base_folder, subfolder)
-    if subfolder_number == 0:
-        return destination
-    return append_subfolder(destination, f"{subfolder_number:0{subfolder_digits}d}")
-
-
 class EndorphinSaveImageAdvanced:
     @classmethod
     def INPUT_TYPES(cls):
@@ -91,8 +84,6 @@ class EndorphinSaveImageAdvanced:
                     "placeholder": "Optional subfolder, e.g. job_01/selected",
                     "tooltip": "Optional relative subfolder inside the selected output folder.",
                 }),
-                "subfolder_number": ("INT", {"default": 0, "min": 0, "max": 1000000000, "step": 1, "tooltip": "Optional numeric subfolder. Set 0 to disable."}),
-                "subfolder_digits": ("INT", {"default": 3, "min": 1, "max": 12, "step": 1, "tooltip": "Digits for numeric subfolder: 3 makes 001."}),
                 "file_format": (["png", "jpeg", "webp"], {"default": "png"}),
                 "suffix_digits": ("INT", {
                     "default": 3,
@@ -138,8 +129,6 @@ class EndorphinSaveImageAdvanced:
         output_folder="(output root)",
         custom_output_folder="",
         subfolder="",
-        subfolder_number=0,
-        subfolder_digits=3,
         file_format="png",
         suffix_digits=3,
         overwrite=False,
@@ -149,7 +138,7 @@ class EndorphinSaveImageAdvanced:
         extra_pnginfo=None,
     ):
         output_dir, _ = resolve_output_folder(output_folder, custom_output_folder)
-        output_dir = append_numbered_subfolder(output_dir, subfolder, subfolder_number, subfolder_digits)
+        output_dir = append_subfolder(output_dir, subfolder)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         full_output_folder, filename, counter, _, _ = folder_paths.get_save_image_path(
