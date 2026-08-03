@@ -31,7 +31,7 @@ An `INT` node with a default value of `1`. Enable **auto_increment** to increase
 Saves images as PNG, JPEG, or WEBP with configurable quality. Choose an existing folder in `ComfyUI/output`, or enter an absolute `custom_output_folder` such as `D:\Images\Job_01` to save outside ComfyUI. Use **subfolder** for a relative nested destination. Set **suffix_digits** to control the numeric suffix, such as `2` for `01` or `5` for `00001`. Enable **overwrite** to omit the suffix and replace an existing file with the same name.
 
 ### Endorphin Cartesian Product (2D/3D)
-An ordered counter for Queue Prompt batches. In 2D mode, `value_2` advances first; after it reaches `max_value_2`, it returns to `1` and `value_1` advances. Set Queue Prompt's **Batch count** to the number of combinations to run. Turn off `auto_increment` to keep the current values for every batch.
+An ordered counter for Queue Prompt batches. Set `min_value` and `max_value` for each dimension. In 2D mode, `value_2` advances first; after it reaches `max_value_2`, it returns to `min_value_2` and `value_1` advances. Set Queue Prompt's **Batch count** to the number of combinations to run. Turn off `auto_increment` to keep the current values for every batch.
 
 ### Endorphin CSV Loader
 Loads one text value from a selected CSV column per Queue Prompt batch item. Use **Browse CSV** to select a local CSV file, enter an absolute path in `csv_path`, or choose a CSV placed in `ComfyUI/input`. The default reads column 2, skips the header, and loops after the final value. Turn off `auto_increment` to use the same row for every batch.
