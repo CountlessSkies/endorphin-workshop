@@ -8,7 +8,7 @@ const DEFAULT_PALETTE = {
         { name: "Blue", hex: "#3B82F6", value: 3 },
     ],
 };
-const MIN_NODE_WIDTH = 365;
+const MIN_NODE_WIDTH = 470;
 
 function normalizeHex(value) {
     return /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : "#808080";
@@ -60,7 +60,7 @@ function createPaletteWidget(node, inputName, inputData) {
             requestAnimationFrame(resize);
         },
         getMinHeight: () => palette.colors.length * 34 + (showImporter ? 210 : 72),
-        getMinWidth: () => 290,
+        getMinWidth: () => MIN_NODE_WIDTH,
     });
 
     function resize() {
@@ -88,7 +88,7 @@ function createPaletteWidget(node, inputName, inputData) {
         root.replaceChildren();
         palette.colors.forEach((color, index) => {
             const row = document.createElement("div");
-            row.style.cssText = `display:grid;grid-template-columns:46px minmax(62px,1fr) 76px 44px 24px;gap:5px;align-items:center;height:31px;margin-bottom:4px;padding:2px;border:1px solid ${index === palette.selected ? "#8ed0ff" : "#555"};background:${index === palette.selected ? "#294b67" : "#292929"};`;
+            row.style.cssText = `display:grid;grid-template-columns:48px minmax(110px,1fr) 90px 48px 26px 26px 26px;gap:5px;align-items:center;height:31px;margin-bottom:4px;padding:2px;border:1px solid ${index === palette.selected ? "#8ed0ff" : "#555"};background:${index === palette.selected ? "#294b67" : "#292929"};`;
             const preview = document.createElement("button");
             preview.type = "button";
             preview.title = "Select this color. Edit the HEX field to change its color.";
@@ -110,16 +110,45 @@ function createPaletteWidget(node, inputName, inputData) {
             int.value = String(color.value);
             [name, hex, int].forEach((input) => {
                 input.style.cssText = "min-width:0;box-sizing:border-box;width:100%;border:1px solid #666;border-radius:2px;padding:3px;background:#171717;color:#eee;font:12px sans-serif;";
-                input.addEventListener("pointerdown", (event) => event.stopPropagation());
+                // LiteGraph's canvas normally consumes these events. Stop all
+                // of them on editable controls so typing works reliably.
+                for (const eventName of ["pointerdown", "mousedown", "mouseup", "click", "dblclick", "keydown", "keyup", "keypress"]) {
+                    input.addEventListener(eventName, (event) => event.stopPropagation());
+                }
             });
             name.onchange = () => { color.name = name.value.trim() || color.name; commit(); };
+            name.onblur = name.onchange;
             hex.onchange = () => {
                 if (/^#[0-9a-f]{6}$/i.test(hex.value.trim())) { color.hex = hex.value.trim().toUpperCase(); preview.style.background = color.hex; commit(); }
                 else hex.value = color.hex;
             };
+            hex.onblur = hex.onchange;
             int.onchange = () => {
                 if (Number.isInteger(Number(int.value))) { color.value = Number(int.value); commit(); }
                 else int.value = String(color.value);
+            };
+            int.onblur = int.onchange;
+            const moveUp = button("↑");
+            moveUp.title = "Move color up";
+            moveUp.style.padding = "3px";
+            moveUp.disabled = index === 0;
+            moveUp.onclick = () => {
+                if (index === 0) return;
+                [palette.colors[index - 1], palette.colors[index]] = [palette.colors[index], palette.colors[index - 1]];
+                palette.selected = index - 1;
+                render();
+                commit();
+            };
+            const moveDown = button("↓");
+            moveDown.title = "Move color down";
+            moveDown.style.padding = "3px";
+            moveDown.disabled = index === palette.colors.length - 1;
+            moveDown.onclick = () => {
+                if (index === palette.colors.length - 1) return;
+                [palette.colors[index], palette.colors[index + 1]] = [palette.colors[index + 1], palette.colors[index]];
+                palette.selected = index + 1;
+                render();
+                commit();
             };
             const remove = button("×");
             remove.title = "Remove color";
@@ -131,7 +160,7 @@ function createPaletteWidget(node, inputName, inputData) {
                 commit();
             };
             row.onclick = () => { palette.selected = index; commit(); };
-            row.append(preview, name, hex, int, remove);
+            row.append(preview, name, hex, int, moveUp, moveDown, remove);
             root.appendChild(row);
         });
         const actions = document.createElement("div");
@@ -187,7 +216,7 @@ function createPaletteWidget(node, inputName, inputData) {
     // frame so a freshly created or restored node cannot be narrower than its
     // row controls.
     requestAnimationFrame(resize);
-    return { widget, minWidth: 290, minHeight: 174 };
+    return { widget, minWidth: MIN_NODE_WIDTH, minHeight: 174 };
 }
 
 app.registerExtension({

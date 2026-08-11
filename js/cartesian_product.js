@@ -9,6 +9,18 @@ function setWidgetValue(widget, value) {
     widget.callback?.(value);
 }
 
+function normalizeCounterValues(node) {
+    if (node.comfyClass !== "EndorphinCartesianProduct") return;
+    for (const index of [1, 2, 3]) {
+        const min = getWidget(node, `min_value_${index}`)?.value;
+        const max = getWidget(node, `max_value_${index}`)?.value;
+        const value = getWidget(node, `value_${index}`);
+        if (min === undefined || max === undefined || !value || min > max) continue;
+        if (value.value < min || value.value > max) setWidgetValue(value, min);
+    }
+    node.graph?.setDirtyCanvas(true, true);
+}
+
 function advanceCounter(node) {
     if (node.comfyClass !== "EndorphinCartesianProduct") return;
     if (!getWidget(node, "auto_increment")?.value) return;
@@ -87,6 +99,9 @@ app.registerExtension({
     setup() {
         const originalGraphToPrompt = app.graphToPrompt;
         app.graphToPrompt = async function () {
+            // Clamp manually-entered starting values before this batch item is
+            // serialized, so min_value is the actual first combination.
+            for (const node of app.graph?._nodes ?? []) normalizeCounterValues(node);
             const prompt = await originalGraphToPrompt.apply(this, arguments);
             // Queue Prompt calls graphToPrompt once per batch item. Advance only
             // after the current values have been serialized into that prompt.

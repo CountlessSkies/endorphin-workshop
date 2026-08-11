@@ -54,6 +54,9 @@ class EndorphinCartesianProduct:
     ):
         if min_value_1 > max_value_1 or min_value_2 > max_value_2 or min_value_3 > max_value_3:
             raise ValueError("Each min_value must be less than or equal to its max_value.")
+        value_1 = min_value_1 if value_1 < min_value_1 or value_1 > max_value_1 else value_1
+        value_2 = min_value_2 if value_2 < min_value_2 or value_2 > max_value_2 else value_2
+        value_3 = min_value_3 if value_3 < min_value_3 or value_3 > max_value_3 else value_3
         return (value_1, value_2, value_3 if dimensions == "3D (triples)" else 0)
 
 
