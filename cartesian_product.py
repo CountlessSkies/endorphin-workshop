@@ -9,18 +9,18 @@ class EndorphinCartesianProduct:
                     "default": "2D (pairs)",
                     "tooltip": "Choose whether to advance pairs or triples.",
                 }),
-                "min_value_1": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
                 "max_value_1": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
-                "min_value_2": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
                 "max_value_2": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
-                "min_value_3": ("INT", {
+                "max_value_3": ("INT", {
                     "default": 1,
                     "min": -1000000,
                     "max": 1000000,
                     "step": 1,
                     "tooltip": "Used only in 3D mode.",
                 }),
-                "max_value_3": ("INT", {
+                "min_value_1": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
+                "min_value_2": ("INT", {"default": 1, "min": -1000000, "max": 1000000, "step": 1}),
+                "min_value_3": ("INT", {
                     "default": 1,
                     "min": -1000000,
                     "max": 1000000,
@@ -49,8 +49,8 @@ class EndorphinCartesianProduct:
     CATEGORY = "Endorphin Workshop/Utilities"
 
     def get_values(
-        self, dimensions, min_value_1, max_value_1, min_value_2, max_value_2,
-        min_value_3, max_value_3, value_1, value_2, value_3, auto_increment,
+        self, dimensions, max_value_1, max_value_2, max_value_3, min_value_1,
+        min_value_2, min_value_3, value_1, value_2, value_3, auto_increment,
     ):
         if min_value_1 > max_value_1 or min_value_2 > max_value_2 or min_value_3 > max_value_3:
             raise ValueError("Each min_value must be less than or equal to its max_value.")
