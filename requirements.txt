@@ -4,3 +4,4 @@ bitsandbytes>=0.46.1
 torch>=2.0.0
 numpy
 pillow
+pillow-heif

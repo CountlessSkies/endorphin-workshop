@@ -4,9 +4,12 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
 
 
-IMAGE_EXTENSIONS = {".avif", ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
+register_heif_opener()
+
+IMAGE_EXTENSIONS = {".avif", ".bmp", ".gif", ".heic", ".heif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
 
 def natural_sort_key(path):
