@@ -77,7 +77,7 @@ class EndorphinFolderImageLoader:
                     "Name (Z-A)",
                     "Modified (oldest first)",
                     "Modified (newest first)",
-                ], {"default": "Natural (1, 2, 10)"}),
+                ], {"default": "Name (A-Z)"}),
                 "image_index": ("INT", {
                     "default": 1,
                     "min": 1,
