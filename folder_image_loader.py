@@ -4,12 +4,18 @@ from pathlib import Path
 import numpy as np
 import torch
 from PIL import Image, ImageOps
-from pillow_heif import register_heif_opener
 
+IMAGE_EXTENSIONS = {".avif", ".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
-register_heif_opener()
-
-IMAGE_EXTENSIONS = {".avif", ".bmp", ".gif", ".heic", ".heif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
+try:
+    from pillow_heif import register_heif_opener
+except ImportError:
+    # HEIC is optional: absence of its decoder must never prevent the whole
+    # Endorphin node pack from loading.
+    register_heif_opener = None
+else:
+    register_heif_opener()
+    IMAGE_EXTENSIONS.update({".heic", ".heif"})
 
 
 def natural_sort_key(path):

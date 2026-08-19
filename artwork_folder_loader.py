@@ -31,12 +31,13 @@ def _sort_paths(paths, sort_mode):
         paths.sort(key=natural_sort_key)
 
 
-def get_artwork_folder_files(root_folder, file_prefix, sort_mode):
+def get_subfolder_files(root_folder, file_prefix, file_suffix, sort_mode):
     root = Path(root_folder).expanduser().resolve()
     if not root.is_dir():
         raise ValueError(f"Artwork root folder was not found: {root}")
 
     prefix = str(file_prefix).strip().casefold()
+    suffix = str(file_suffix).strip().casefold()
     folders = [path for path in root.rglob("*") if path.is_dir()]
     _sort_paths(folders, sort_mode)
 
@@ -47,6 +48,7 @@ def get_artwork_folder_files(root_folder, file_prefix, sort_mode):
             if path.is_file()
             and path.suffix.casefold() in IMAGE_EXTENSIONS
             and (not prefix or path.name.casefold().startswith(prefix))
+            and (not suffix or path.stem.casefold().endswith(suffix))
         ]
         if not files:
             continue
@@ -54,8 +56,13 @@ def get_artwork_folder_files(root_folder, file_prefix, sort_mode):
         entries.append((folder, files[0]))
 
     if not entries:
-        label = f" with prefix '{file_prefix}'" if prefix else ""
-        raise ValueError(f"No artwork image files were found in subfolders of: {root}{label}")
+        filters = []
+        if prefix:
+            filters.append(f"prefix '{file_prefix}'")
+        if suffix:
+            filters.append(f"suffix '{file_suffix}'")
+        label = f" matching {' and '.join(filters)}" if filters else ""
+        raise ValueError(f"No image files were found in subfolders of: {root}{label}")
     return root, entries
 
 
@@ -66,20 +73,32 @@ def strip_file_prefix(file_stem, file_prefix):
     return re.sub(r"^[ _-]+", "", file_stem[len(prefix):])
 
 
+def strip_file_prefix_and_suffix(file_stem, file_prefix, file_suffix):
+    value = strip_file_prefix(file_stem, file_prefix)
+    suffix = str(file_suffix).strip()
+    if suffix and value.casefold().endswith(suffix.casefold()):
+        value = value[:-len(suffix)]
+    return re.sub(r"[ _-]+$", "", value)
+
+
 class EndorphinArtworkFolderLoader:
-    """Load the first matching artwork file from each recursive subfolder."""
+    """Load the first prefix/suffix-matching file from each recursive subfolder."""
 
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "root_folder": ("STRING", {
-                    "default": r"G:\My Drive\_Etsy\_Artwork",
+                    "default": "",
                     "tooltip": "Root folder scanned recursively for artwork subfolders.",
                 }),
                 "file_prefix": ("STRING", {
-                    "default": "artwork",
+                    "default": "",
                     "tooltip": "Only files whose name starts with this prefix are considered. Leave blank to allow every image.",
+                }),
+                "file_suffix": ("STRING", {
+                    "default": "",
+                    "tooltip": "Only files whose name (without extension) ends with this suffix are considered. Leave blank to allow every suffix.",
                 }),
                 "sort": (SORT_OPTIONS, {"default": "Name (A-Z)"}),
                 "folder_index": ("INT", {
@@ -102,23 +121,23 @@ class EndorphinArtworkFolderLoader:
 
     RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING", "STRING", "STRING", "INT", "INT")
     RETURN_NAMES = (
-        "image", "file_name", "file_name_no_ext", "file_name_no_ext_no_prefix",
+        "image", "file_name", "file_name_no_ext", "file_name_no_ext_no_prefix_no_suffix",
         "folder_name", "relative_path", "folder_index", "total_folders",
     )
     FUNCTION = "load_artwork"
     CATEGORY = "Endorphin Workshop/Utilities"
 
     @staticmethod
-    def _selected_entry(root_folder, file_prefix, sort, folder_index, loop):
-        root, entries = get_artwork_folder_files(root_folder, file_prefix, sort)
+    def _selected_entry(root_folder, file_prefix, file_suffix, sort, folder_index, loop):
+        root, entries = get_subfolder_files(root_folder, file_prefix, file_suffix, sort)
         index = (folder_index - 1) % len(entries) if loop else min(folder_index - 1, len(entries) - 1)
         return root, entries, index, entries[index]
 
     @classmethod
-    def IS_CHANGED(cls, root_folder, file_prefix, sort, folder_index, auto_increment, loop):
+    def IS_CHANGED(cls, root_folder, file_prefix, file_suffix, sort, folder_index, auto_increment, loop):
         try:
             root, entries, index, (_folder, file_path) = cls._selected_entry(
-                root_folder, file_prefix, sort, folder_index, loop
+                root_folder, file_prefix, file_suffix, sort, folder_index, loop
             )
             stat = file_path.stat()
             listing = "\n".join(str(path.relative_to(root)) for _, path in entries)
@@ -127,9 +146,9 @@ class EndorphinArtworkFolderLoader:
         except (OSError, ValueError):
             return float("nan")
 
-    def load_artwork(self, root_folder, file_prefix, sort, folder_index, auto_increment, loop):
+    def load_artwork(self, root_folder, file_prefix, file_suffix, sort, folder_index, auto_increment, loop):
         root, entries, index, (folder, file_path) = self._selected_entry(
-            root_folder, file_prefix, sort, folder_index, loop
+            root_folder, file_prefix, file_suffix, sort, folder_index, loop
         )
         with Image.open(file_path) as source:
             source = ImageOps.exif_transpose(source)
@@ -143,7 +162,7 @@ class EndorphinArtworkFolderLoader:
             image_tensor,
             file_path.name,
             file_path.stem,
-            strip_file_prefix(file_path.stem, file_prefix),
+            strip_file_prefix_and_suffix(file_path.stem, file_prefix, file_suffix),
             folder.name,
             relative_path,
             index + 1,
@@ -152,4 +171,4 @@ class EndorphinArtworkFolderLoader:
 
 
 NODE_CLASS_MAPPINGS = {"EndorphinArtworkFolderLoader": EndorphinArtworkFolderLoader}
-NODE_DISPLAY_NAME_MAPPINGS = {"EndorphinArtworkFolderLoader": "Endorphin Artwork Folder Loader"}
+NODE_DISPLAY_NAME_MAPPINGS = {"EndorphinArtworkFolderLoader": "Endorphin Subfolder Image Loader"}
