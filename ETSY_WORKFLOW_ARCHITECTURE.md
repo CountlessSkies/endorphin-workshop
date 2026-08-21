@@ -84,6 +84,18 @@ be reused for a different design.
 Project Selector routes are `artwork_foundation`, `artwork_stitchwork`, and
 `artwork_colorway`; only the selected route is intended to be evaluated.
 
+### Artwork stages
+
+```text
+Foundation: artwork_<ID>_transparent -> base_<ID>_transparent
+Stitchwork: base_<ID>_print -> base_<ID>_emb
+Colorway:   base_<ID>_emb -> colored mockup outputs
+```
+
+`base_<ID>_print` is a deliberate manual handoff. Selecting Stitchwork before
+that file exists must fail with the expected path and must not invoke an image
+generation node.
+
 Artwork may be generated directly with transparency; an opaque original is
 optional rather than required. The resulting artwork produces three deliberately
 separate branches.
@@ -144,6 +156,65 @@ Project Selector routes are `redesign_emb_candidate`,
 `redesign_print_candidate`, and `redesign_colorway`. Print candidate generation
 includes simplification in its candidate prompt; it has no separate simplify
 stage.
+
+## Target minimal node architecture
+
+The intended end state is **two public Etsy nodes**, not a chain of selector,
+stage, source-loader, candidate-loader, and palette nodes.
+
+### 1. Endorphin Etsy Project Selector
+
+This is the project control panel. It owns project-folder selection and the
+currently selected route. It exposes a common `context` metadata output for
+file operations plus one selected route token; route outputs are available for
+open, user-wired branches:
+
+```text
+artwork_foundation
+artwork_stitchwork
+artwork_colorway
+redesign_emb_candidate
+redesign_print_candidate
+redesign_colorway
+```
+
+The UI progressively reveals only valid choices. Artwork shows its three
+stages. Redesign shows Candidate or Colorway; Candidate then chooses Embroidery
+Reference or Print Reference. The two redesign source types are independent
+routes, not ordered stages. Print Reference performs simplification inside its
+candidate-generation prompt; it does not persist a separate simplify asset.
+
+For `redesign_colorway`, the Selector also owns candidate selection: it lists
+available candidates, previews the selected candidate, and can approve it.
+The resulting context carries `product_id` and the selected candidate path.
+
+The Etsy Color Palette is integrated into this Selector and shown only on
+Colorway routes. The selected row contributes `color_name`, `color_hex`, and
+`color_code` to context. For queue batching, a separate `color_index` control
+(for example the existing Auto Reset Int) determines which palette row is used
+for a given queue item; the palette editor remains the durable editable source
+of all color data.
+
+### 2. Endorphin Etsy Stage Save
+
+One output node receives `images` and `context`. Prefix and suffix use fixed
+dropdown conventions rather than arbitrary text:
+
+```text
+prefix: artwork / base / mockup / candidate
+suffix: none / transparent / print / emb
+```
+
+Colorway uses `color_code` from context when constructing its filename. Choosing
+the `candidate` convention for a Redesign context uses the alphabetical
+allocator: it scans persisted candidates, fills missing unapproved letters
+first, and never reuses an approved letter.
+
+## Routing requirement
+
+Selector route outputs alone do not stop ComfyUI evaluation. Each eventual
+branch merge/save must use lazy inputs keyed by the selected route, so ComfyUI
+requests only the active Artwork/Redesign route and only its selected stage.
 
 Redesign creates only embroidery outputs. It intentionally has no print branch.
 
