@@ -81,34 +81,41 @@ be reused for a different design.
 
 ## Workflow A — Idea / Artwork
 
-The original artwork produces three deliberately separate branches.
+Project Selector routes are `artwork_foundation`, `artwork_stitchwork`, and
+`artwork_colorway`; only the selected route is intended to be evaluated.
+
+Artwork may be generated directly with transparency; an opaque original is
+optional rather than required. The resulting artwork produces three deliberately
+separate branches.
 
 ```mermaid
 flowchart TD
-    A[artwork_ID: original supplied artwork] --> B[Transparent branch]
-    B --> C[artwork_ID_transparent: digital download asset]
+    A[artwork_ID_transparent] --> C[Digital download asset]
 
     A --> D[Embroidery preparation]
     D --> E[base_ID_flat: digitize-friendly simplified design]
-    E --> F[base_ID_transparent]
-    F --> G[mockup_ID_neutral: place base on a neutral mockup]
-    G --> H[Embroidery simulation]
+    E --> F[Manual mockup_ID_print]
+    F --> G{Print mockup exists?}
+    G -->|yes| H[Convert print mockup to embroidery]
     H --> I[Embroidery colorway]
     I --> J[emb output files]
 
-    A --> K[Print mockup generation directly from original artwork]
+    A --> K[Manual / free print mockup generation]
     K --> L[Optional print colorway]
     L --> M[print output files]
 ```
 
 Important rules:
 
-1. `artwork_<ID>_transparent` exists only for the digital-download product.
-2. The print-mockup branch can generate freely from `artwork_<ID>` directly. It
-   does **not** have to use `base`, a neutral mockup, or the embroidery process.
-3. The embroidery branch is the controlled one: simplify to `base`, place it on
-   a neutral mockup, simulate embroidery, then generate colorways.
-4. `print` and `emb` are separate output folders. Do not make one color folder
+1. `artwork_<ID>_transparent` is the canonical artwork asset and the
+   digital-download product asset.
+2. `mockup_<ID>_print` is prepared manually. Its existence is an explicit gate
+   before any artwork-to-embroidery conversion runs.
+3. The print-mockup branch can otherwise be generated freely from the artwork;
+   it does **not** have to use the embroidery process.
+4. The embroidery branch is controlled: simplify to `base` where needed, use
+   the approved manual print mockup, convert it to embroidery, then colorway.
+5. `print` and `emb` are separate output folders. Do not make one color folder
    per color; color variants live directly in each output folder.
 
 ### Artwork folder example
@@ -119,8 +126,7 @@ artwork\
    ├─ artwork_2608001.png
    ├─ artwork_2608001_transparent.png
    ├─ base_2608001_flat.png
-   ├─ base_2608001_transparent.png
-   ├─ mockup_2608001_neutral.png
+   ├─ mockup_2608001_print.png              # prepared manually
    ├─ print\
    │  ├─ mockup_2608001_C01_mocha-taupe_print.png
    │  └─ mockup_2608001_C02_soft-white_print.png
@@ -133,6 +139,11 @@ artwork\
 the print branch.
 
 ## Workflow B — Redesign for embroidery
+
+Project Selector routes are `redesign_emb_candidate`,
+`redesign_print_candidate`, and `redesign_colorway`. Print candidate generation
+includes simplification in its candidate prompt; it has no separate simplify
+stage.
 
 Redesign creates only embroidery outputs. It intentionally has no print branch.
 
@@ -172,20 +183,15 @@ redesign\
    ├─ source\
    │  └─ supplier-image-final (3).jpg       # arbitrary original filename
    ├─ base_RD2608001_flat.png                # only for print_reference
-   ├─ candidates\
-   │  ├─ candidate_RD2608001A.png
-   │  ├─ candidate_RD2608001B.png
-   │  ├─ candidate_RD2608001C.png
-   │  └─ candidate_RD2608001D.png
+   ├─ candidate_RD2608001A.png
+   ├─ candidate_RD2608001B.png
+   ├─ candidate_RD2608001C.png
+   ├─ candidate_RD2608001D.png
    ├─ RD2608001A\
-   │  ├─ mockup_RD2608001A_neutral.png
-   │  └─ emb\
-   │     ├─ mockup_RD2608001A_C01_mocha-taupe_emb.png
-   │     └─ mockup_RD2608001A_C02_soft-white_emb.png
+   │  ├─ mockup_RD2608001A_MTP.png
+   │  └─ mockup_RD2608001A_SWH.png
    └─ RD2608001B\
-      ├─ mockup_RD2608001B_neutral.png
-      └─ emb\
-         └─ mockup_RD2608001B_C01_mocha-taupe_emb.png
+      └─ mockup_RD2608001B_MTP.png
 ```
 
 ## Candidate approval rule
@@ -200,6 +206,10 @@ candidate slot B -> RD2608001B
 candidate slot C -> RD2608001C
 candidate slot D -> RD2608001D
 ```
+
+The candidate file is also that candidate's neutral/master asset. Approval
+does not duplicate it as a separate `mockup_..._neutral` file; it only grants
+the fixed product ID permission to enter Colorway.
 
 The operator can approve multiple candidates, for example `B` and `D`. Only
 approved IDs appear in the downstream colorway picker/loader. If none has been
@@ -247,7 +257,7 @@ For every image, the node performs this allocation:
 
 ```text
 1. Read project.json to find approved/locked letters.
-2. Scan the candidate folder for existing candidate files.
+2. Scan the redesign project folder for existing candidate files.
 3. Starting at A, choose the first letter that is neither locked nor occupied.
 4. Save the image and expose its letter, product_id, and path as outputs.
 ```

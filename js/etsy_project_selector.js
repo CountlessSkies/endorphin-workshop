@@ -5,6 +5,7 @@ const DEFAULT_PROJECT = {
     project_id: "RD2608001",
     workflow_type: "redesign",
     source_type: "embroidery_reference",
+    route: "redesign_emb_candidate",
     creation_period: new Date().toISOString().slice(2, 7).replace("-", ""),
 };
 
@@ -17,6 +18,7 @@ function parseProject(value) {
             project_id: String(data?.project_id || (workflow === "artwork" ? "2608001" : "RD2608001")),
             workflow_type: workflow,
             source_type: data?.source_type === "print_reference" ? "print_reference" : "embroidery_reference",
+            route: String(data?.route || (workflow === "artwork" ? "artwork_foundation" : data?.source_type === "print_reference" ? "redesign_print_candidate" : "redesign_emb_candidate")),
             creation_period: /^\d{4}$/.test(String(data?.creation_period || "")) ? String(data.creation_period) : DEFAULT_PROJECT.creation_period,
         };
     } catch {
@@ -152,6 +154,7 @@ function createProjectSelector(node, inputName, inputData) {
         root.append(label("Workflow"));
         root.append(cards([["artwork", "Artwork"], ["redesign", "Redesign"]], project.workflow_type, (value) => {
             project.workflow_type = value;
+            project.route = value === "artwork" ? "artwork_foundation" : "redesign_emb_candidate";
             project.project_id = "";
             status = "";
             projects = [];
@@ -214,11 +217,11 @@ function createProjectSelector(node, inputName, inputData) {
         hint.textContent = status || `Pick an existing ID, or create the next ${project.creation_period}NNN ID automatically.`;
         hint.style.cssText = "min-height:15px;margin-top:3px;color:#aab8c5;font-size:11px;";
         root.append(hint);
-        root.append(label("Source"));
+        root.append(label("Route"));
         if (project.workflow_type === "artwork") {
-            root.append(cards([["idea_artwork", "Artwork"]], "idea_artwork", () => {}));
+            root.append(cards([["artwork_foundation", "Foundation"], ["artwork_stitchwork", "Stitchwork"], ["artwork_colorway", "Colorway"]], project.route, (value) => { project.route = value; project.source_type = "idea_artwork"; }));
         } else {
-            root.append(cards([["embroidery_reference", "Embroidery reference"], ["print_reference", "Print reference"]], project.source_type, (value) => { project.source_type = value; }));
+            root.append(cards([["redesign_emb_candidate", "Embroidery candidate"], ["redesign_print_candidate", "Print candidate"], ["redesign_colorway", "Colorway"]], project.route, (value) => { project.route = value; project.source_type = value === "redesign_print_candidate" ? "print_reference" : value === "redesign_emb_candidate" ? "embroidery_reference" : "approved_candidate"; }));
         }
     }
     render();

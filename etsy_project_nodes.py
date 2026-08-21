@@ -19,6 +19,8 @@ from server import PromptServer
 
 
 CONTEXT_TYPE = "ENDORPHIN_ETSY_CONTEXT"
+ARTWORK_STATE_TYPE = "ENDORPHIN_ETSY_ARTWORK_STATE"
+ROUTE_TYPE = "ENDORPHIN_ETSY_ROUTE"
 DEFAULT_ROOT = r"G:\My Drive\_Etsy\_Listing"
 MANIFEST_NAME = "project.json"
 CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -86,7 +88,6 @@ async def create_etsy_project(request):
             (project_dir / "emb").mkdir()
         else:
             (project_dir / "source").mkdir()
-            candidate_folder(project_dir).mkdir()
             write_manifest(project_dir, {
                 "schema_version": 1,
                 "project_id": project_id,
@@ -184,7 +185,8 @@ def write_manifest(project_dir, manifest):
 
 
 def candidate_folder(project_dir):
-    return project_dir / "candidates"
+    """Candidates live directly in the redesign project folder."""
+    return project_dir
 
 
 def candidate_file_stem(project_id, letter):
@@ -304,14 +306,14 @@ class EndorphinEtsyProjectSelector:
 
     @classmethod
     def INPUT_TYPES(cls):
-        default = {"root_folder": DEFAULT_ROOT, "project_id": "RD2608001", "workflow_type": "redesign", "source_type": "embroidery_reference"}
+        default = {"root_folder": DEFAULT_ROOT, "project_id": "RD2608001", "workflow_type": "redesign", "source_type": "embroidery_reference", "route": "redesign_emb_candidate"}
         return {"required": {"project": ("ENDORPHIN_ETSY_PROJECT_SELECTOR", {
             "default": json.dumps(default, separators=(",", ":")),
             "tooltip": "Choose Artwork or Redesign, then its applicable source. Artwork always uses artwork as its source.",
         })}}
 
-    RETURN_TYPES = (CONTEXT_TYPE, "STRING", "STRING", "STRING", "STRING")
-    RETURN_NAMES = ("context", "workflow_type", "source_type", "project_id", "project_path")
+    RETURN_TYPES = (CONTEXT_TYPE, ROUTE_TYPE, ROUTE_TYPE, ROUTE_TYPE, ROUTE_TYPE, ROUTE_TYPE, ROUTE_TYPE)
+    RETURN_NAMES = ("context", "artwork_foundation", "artwork_stitchwork", "artwork_colorway", "redesign_emb_candidate", "redesign_print_candidate", "redesign_colorway")
     FUNCTION = "select"
     CATEGORY = "Endorphin Workshop/Etsy"
 
@@ -326,9 +328,11 @@ class EndorphinEtsyProjectSelector:
         workflow_type = str(data.get("workflow_type", "")).strip().lower()
         if workflow_type not in {"artwork", "redesign"}:
             raise ValueError("Workflow type must be artwork or redesign.")
-        source_type = "idea_artwork" if workflow_type == "artwork" else str(data.get("source_type", "")).strip().lower()
-        if source_type not in {"embroidery_reference", "print_reference"} and workflow_type == "redesign":
-            raise ValueError("Redesign source type must be embroidery_reference or print_reference.")
+        route = str(data.get("route", "")).strip().lower()
+        allowed = {"artwork_foundation", "artwork_stitchwork", "artwork_colorway", "redesign_emb_candidate", "redesign_print_candidate", "redesign_colorway"}
+        if route not in allowed or not route.startswith(f"{workflow_type}_"):
+            raise ValueError("Choose a valid route for the selected workflow type.")
+        source_type = "idea_artwork" if workflow_type == "artwork" else ("embroidery_reference" if route == "redesign_emb_candidate" else "print_reference" if route == "redesign_print_candidate" else "approved_candidate")
         project_id = normalize_identifier(data.get("project_id"), "Project ID")
         if workflow_type == "redesign" and not project_id.startswith("RD"):
             raise ValueError("Redesign ID must start with RD.")
@@ -337,10 +341,13 @@ class EndorphinEtsyProjectSelector:
             "workflow_type": workflow_type,
             "project_id": project_id,
             "source_type": source_type,
+            "route": route,
             "root_folder": root_folder,
             "asset_stage": "project",
         })
-        return (context, workflow_type, source_type, project_id, context["project_path"])
+        route_token = dict(context)
+        routes = ["artwork_foundation", "artwork_stitchwork", "artwork_colorway", "redesign_emb_candidate", "redesign_print_candidate", "redesign_colorway"]
+        return (context, *[route_token if route == name else None for name in routes])
 
 
 MAX_SOURCE_TYPES = 5
@@ -577,14 +584,16 @@ class EndorphinEtsySourceAssetLoader:
         context = context_from_value(context)
         project_dir = Path(context["project_path"])
         if context["workflow_type"] == "artwork":
-            expected_stem = f"artwork_{context['project_id']}".lower()
-            candidates = [path for path in project_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS and path.stem.lower() == expected_stem] if project_dir.exists() else []
+            expected_stems = [f"artwork_{context['project_id']}_transparent".lower(), f"artwork_{context['project_id']}".lower()]
+            files = [path for path in project_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS] if project_dir.exists() else []
+            candidates = [next((path for path in files if path.stem.lower() == stem), None) for stem in expected_stems]
+            candidates = [path for path in candidates if path is not None]
         else:
             source_dir = project_dir / "source"
             candidates = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=lambda path: path.name.casefold()) if source_dir.exists() else []
         if not candidates:
             if context["workflow_type"] == "artwork":
-                expected = project_dir / f"artwork_{context['project_id']}.png"
+                expected = project_dir / f"artwork_{context['project_id']}_transparent.png"
             else:
                 expected = project_dir / "source"
             raise ValueError(f"No source image found. Expected: {expected}")
@@ -592,6 +601,133 @@ class EndorphinEtsySourceAssetLoader:
         source_context = dict(context)
         source_context.update({"asset_stage": "source", "source_path": str(source_path)})
         return (load_image(source_path), source_context, source_path.name, str(source_path))
+
+
+class EndorphinEtsyArtworkPrintMockupCheck:
+    """Require the manually prepared print mockup before artwork embroidery work."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"context": (CONTEXT_TYPE,)}}
+
+    RETURN_TYPES = ("IMAGE", CONTEXT_TYPE, "STRING")
+    RETURN_NAMES = ("print_mockup", "print_mockup_context", "print_mockup_path")
+    FUNCTION = "load"
+    CATEGORY = "Endorphin Workshop/Etsy"
+
+    def load(self, context):
+        context = context_from_value(context)
+        if context["workflow_type"] != "artwork":
+            raise ValueError("Artwork Print Mockup Check is available only for Artwork projects.")
+        project_dir = Path(context["project_path"])
+        expected_stem = f"mockup_{context['project_id']}_print".lower()
+        matches = [
+            path for path in project_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS and path.stem.lower() == expected_stem
+        ] if project_dir.exists() else []
+        if not matches:
+            expected = project_dir / f"mockup_{context['project_id']}_print.png"
+            raise ValueError(
+                "Manual print mockup is required before Artwork embroidery conversion. "
+                f"Create it first: {expected}"
+            )
+        mockup_path = sorted(matches, key=lambda path: path.name.casefold())[0]
+        mockup_context = dict(context)
+        mockup_context.update({"asset_stage": "print_mockup", "print_mockup_path": str(mockup_path)})
+        return (load_image(mockup_path), mockup_context, str(mockup_path))
+
+
+def artwork_state_from_value(state, context):
+    context = context_from_value(context)
+    if context["workflow_type"] != "artwork":
+        raise ValueError("Artwork states are available only for Artwork projects.")
+    if not isinstance(state, dict):
+        raise ValueError("Invalid Artwork state. Connect Endorphin Etsy Artwork State.")
+    value = str(state.get("state", "")).strip().lower()
+    if value not in {"foundation", "stitchwork", "colorway"}:
+        raise ValueError("Artwork state must be Foundation, Stitchwork, or Colorway.")
+    if str(state.get("project_id", "")).upper() != context["project_id"]:
+        raise ValueError("Artwork state belongs to a different project ID.")
+    return value
+
+
+class EndorphinEtsyArtworkState:
+    """Select the one Artwork stage allowed to execute for this queue."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "context": (CONTEXT_TYPE,),
+            "state": (["Foundation", "Stitchwork", "Colorway"], {"default": "Foundation"}),
+        }}
+
+    RETURN_TYPES = (ARTWORK_STATE_TYPE, "BOOLEAN", "BOOLEAN", "BOOLEAN", "STRING")
+    RETURN_NAMES = ("artwork_state", "foundation_enabled", "stitchwork_enabled", "colorway_enabled", "state_name")
+    FUNCTION = "select"
+    CATEGORY = "Endorphin Workshop/Etsy"
+
+    def select(self, context, state):
+        context = context_from_value(context)
+        if context["workflow_type"] != "artwork":
+            raise ValueError("Endorphin Etsy Artwork State requires an Artwork project.")
+        value = str(state).strip().lower()
+        token = {"schema_version": 1, "project_id": context["project_id"], "state": value}
+        return (token, value == "foundation", value == "stitchwork", value == "colorway", str(state))
+
+
+class EndorphinEtsyArtworkStateAssetLoader:
+    """Load the precise prior asset required by the selected Artwork state."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"context": (CONTEXT_TYPE,), "artwork_state": (ARTWORK_STATE_TYPE,)}}
+
+    RETURN_TYPES = ("IMAGE", CONTEXT_TYPE, "STRING", "STRING")
+    RETURN_NAMES = ("image", "asset_context", "asset_stage", "asset_path")
+    FUNCTION = "load"
+    CATEGORY = "Endorphin Workshop/Etsy"
+
+    def load(self, context, artwork_state):
+        context = context_from_value(context)
+        state = artwork_state_from_value(artwork_state, context)
+        project_dir = Path(context["project_path"])
+        if state == "foundation":
+            stems = [f"artwork_{context['project_id']}_transparent", f"artwork_{context['project_id']}"]
+        elif state == "stitchwork":
+            stems = [f"base_{context['project_id']}_print"]
+        else:
+            stems = [f"base_{context['project_id']}_emb"]
+        files = [path for path in project_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS] if project_dir.exists() else []
+        asset = next((path for stem in stems for path in files if path.stem.lower() == stem.lower()), None)
+        if asset is None:
+            expected = project_dir / f"{stems[0]}.png"
+            raise ValueError(f"{state.title()} requires this file before it can run: {expected}")
+        asset_context = dict(context)
+        asset_context.update({"asset_stage": state, "asset_path": str(asset)})
+        return (load_image(asset), asset_context, state, str(asset))
+
+
+class EndorphinEtsyRedesignStage:
+    """Select the runnable Redesign stage while keeping branch wiring explicit."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {
+            "context": (CONTEXT_TYPE,),
+            "stage": (["Candidate", "Colorway"], {"default": "Candidate"}),
+        }}
+
+    RETURN_TYPES = ("ENDORPHIN_ETSY_REDESIGN_STAGE", "BOOLEAN", "BOOLEAN", "STRING")
+    RETURN_NAMES = ("redesign_stage", "candidate_enabled", "colorway_enabled", "stage_name")
+    FUNCTION = "select"
+    CATEGORY = "Endorphin Workshop/Etsy"
+
+    def select(self, context, stage):
+        context = context_from_value(context)
+        if context["workflow_type"] != "redesign":
+            raise ValueError("Endorphin Etsy Redesign Stage requires a Redesign project.")
+        value = str(stage).strip().lower()
+        return ({"schema_version": 1, "project_id": context["project_id"], "stage": value}, value == "candidate", value == "colorway", str(stage))
 
 
 class EndorphinCandidateSave:
@@ -644,6 +780,106 @@ class EndorphinCandidateSave:
             paths.append(str(destination))
 
         return {"ui": {"saved": paths}, "result": (images, ",".join(letters), ",".join(product_ids), "\n".join(paths))}
+
+
+def stage_filename(prefix, identifier, suffix, color_code=""):
+    prefix = str(prefix).strip() or "asset"
+    suffix = str(suffix).strip().replace("{color_code}", str(color_code).strip().upper())
+    value = f"{prefix}_{identifier}{suffix}"
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        raise ValueError("Prefix and suffix may use letters, numbers, underscores, hyphens, and {color_code} only.")
+    return value
+
+
+class EndorphinEtsyStageSave:
+    """Base class for convention-aware Etsy stage outputs."""
+    STAGE = ""
+    DEFAULT_PREFIX = "asset"
+    DEFAULT_SUFFIX = ""
+    REQUIRES_PRODUCT = False
+    OUTPUT_SUBFOLDER = ""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        inputs = {
+            "enabled": ("BOOLEAN", {"default": True}),
+            "images": ("IMAGE", {"lazy": True}),
+            "context": (CONTEXT_TYPE,),
+            "prefix": (["artwork", "base", "mockup", "candidate"], {"default": "base"}),
+            "suffix": (["none", "transparent", "print", "emb"], {"default": "none"}),
+            "color_code": ("STRING", {"default": ""}),
+            "png_compress_level": ("INT", {"default": 4, "min": 0, "max": 9, "step": 1}),
+        }
+        return {"required": inputs, "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"}}
+
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("images", "candidate_letters", "product_ids", "saved_paths")
+    FUNCTION = "save"
+    OUTPUT_NODE = True
+    CATEGORY = "Endorphin Workshop/Etsy"
+
+    def check_lazy_status(self, enabled, images=None, **kwargs):
+        return ["images"] if enabled else []
+
+    def save(self, enabled, images=None, context=None, prefix="base", suffix="none", color_code="", png_compress_level=4, prompt=None, extra_pnginfo=None):
+        context = context_from_value(context)
+        if not enabled:
+            return {"result": (images, "", "", "")}
+        project_dir = Path(context["project_path"])
+        if prefix == "candidate":
+            if context["workflow_type"] != "redesign":
+                raise ValueError("Candidate naming is available only for Redesign projects.")
+            manifest = load_manifest(project_dir, context)
+            letters, product_ids, paths = [], [], []
+            for image in images:
+                letter, reservation = reserve_next_candidate(project_dir, context["project_id"], set(manifest["approved_candidates"]))
+                path = project_dir / f"{candidate_file_stem(context['project_id'], letter)}.png"
+                try:
+                    save_png(image, path, prompt, extra_pnginfo, png_compress_level)
+                finally:
+                    reservation.unlink(missing_ok=True)
+                letters.append(letter); product_ids.append(f"{context['project_id']}{letter}"); paths.append(str(path))
+            return {"ui": {"saved": paths}, "result": (images, ",".join(letters), ",".join(product_ids), "\n".join(paths))}
+        identifier = context.get("product_id") or context["project_id"]
+        directory = Path(context.get("product_path") or project_dir)
+        directory.mkdir(parents=True, exist_ok=True)
+        suffix_value = "" if suffix == "none" else f"_{suffix}"
+        if color_code:
+            suffix_value += f"_{str(color_code).strip().upper()}"
+        stem = stage_filename(prefix, identifier, suffix_value)
+        paths = []
+        for index, image in enumerate(images):
+            extra = "" if len(images) == 1 else f"_{index + 1:02d}"
+            path = directory / f"{stem}{extra}.png"
+            save_png(image, path, prompt, extra_pnginfo, png_compress_level)
+            paths.append(str(path))
+        return {"ui": {"saved": paths}, "result": (images, "", "", "\n".join(paths))}
+
+
+class EndorphinEtsyArtworkFoundationSave(EndorphinEtsyStageSave):
+    STAGE = "Artwork Foundation"
+    DEFAULT_PREFIX = "base"
+    DEFAULT_SUFFIX = "_transparent"
+
+
+class EndorphinEtsyArtworkStitchworkSave(EndorphinEtsyStageSave):
+    STAGE = "Artwork Stitchwork"
+    DEFAULT_PREFIX = "base"
+    DEFAULT_SUFFIX = "_emb"
+
+
+class EndorphinEtsyArtworkColorwaySave(EndorphinEtsyStageSave):
+    STAGE = "Artwork Colorway"
+    DEFAULT_PREFIX = "mockup"
+    DEFAULT_SUFFIX = "_{color_code}"
+    OUTPUT_SUBFOLDER = "emb"
+
+
+class EndorphinEtsyRedesignColorwaySave(EndorphinEtsyStageSave):
+    STAGE = "Redesign Colorway"
+    DEFAULT_PREFIX = "mockup"
+    DEFAULT_SUFFIX = "_{color_code}"
+    REQUIRES_PRODUCT = True
 
 
 class EndorphinApproveRedesignCandidate:
@@ -735,23 +971,23 @@ class EndorphinApprovedCandidateLoader:
 
 
 NODE_CLASS_MAPPINGS = {
-    "EndorphinEtsyProjectContext": EndorphinEtsyProjectContext,
     "EndorphinEtsyProjectSelector": EndorphinEtsyProjectSelector,
-    "EndorphinEtsyWorkflowStage": EndorphinEtsyWorkflowStage,
-    "EndorphinEtsyLazyWorkflowRouter": EndorphinEtsyLazyWorkflowRouter,
     "EndorphinEtsySourceAssetLoader": EndorphinEtsySourceAssetLoader,
-    "EndorphinEtsyCandidateSave": EndorphinCandidateSave,
+    "EndorphinEtsyArtworkStage": EndorphinEtsyArtworkState,
+    "EndorphinEtsyArtworkStageAssetLoader": EndorphinEtsyArtworkStateAssetLoader,
+    "EndorphinEtsyRedesignStage": EndorphinEtsyRedesignStage,
     "EndorphinEtsyApproveRedesignCandidate": EndorphinApproveRedesignCandidate,
     "EndorphinEtsyApprovedCandidateLoader": EndorphinApprovedCandidateLoader,
+    "EndorphinEtsyStageSave": EndorphinEtsyStageSave,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "EndorphinEtsyProjectContext": "Endorphin Etsy Project Context (Advanced)",
     "EndorphinEtsyProjectSelector": "Endorphin Etsy Project Selector",
-    "EndorphinEtsyWorkflowStage": "Endorphin Etsy Workflow Stage",
-    "EndorphinEtsyLazyWorkflowRouter": "Endorphin Etsy Lazy Workflow Router",
     "EndorphinEtsySourceAssetLoader": "Endorphin Etsy Source Asset Loader",
-    "EndorphinEtsyCandidateSave": "Endorphin Etsy Candidate Save",
+    "EndorphinEtsyArtworkStage": "Endorphin Etsy Artwork Stage",
+    "EndorphinEtsyArtworkStageAssetLoader": "Endorphin Etsy Artwork Stage Asset Loader",
+    "EndorphinEtsyRedesignStage": "Endorphin Etsy Redesign Stage",
     "EndorphinEtsyApproveRedesignCandidate": "Endorphin Etsy Approve Redesign Candidate",
     "EndorphinEtsyApprovedCandidateLoader": "Endorphin Etsy Approved Candidate Loader",
+    "EndorphinEtsyStageSave": "Endorphin Etsy Stage Save",
 }

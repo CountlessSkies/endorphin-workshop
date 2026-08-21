@@ -50,9 +50,11 @@ paths stay consistent. The architecture and naming conventions are documented
 in [ETSY_WORKFLOW_ARCHITECTURE.md](ETSY_WORKFLOW_ARCHITECTURE.md).
 
 ### Endorphin Etsy Project Selector
-Choose **Artwork** or **Redesign**, then select an existing project ID from a
-folder scan. **Refresh** scans all direct project folders for the selected
-workflow and removes an ID from the picker when its folder no longer exists.
+Choose **Artwork** or **Redesign**, then one route: Artwork Foundation,
+Stitchwork, Colorway; or Redesign Embroidery Candidate, Print Candidate,
+Colorway. The node emits a common `context` plus one matching route token.
+**Refresh** scans all direct project folders for the selected workflow and
+removes an ID from the picker when its folder no longer exists.
 
 The separate **Year** and **Month** dropdowns affect only **+ New**. That
 button creates the lowest available `YYMMNNN` ID for Artwork, or
@@ -82,6 +84,14 @@ name, HEX value, integer value, and unique three-letter color code. Color codes
 are suggested from a name only after that name is committed (blur/change), not
 while typing; manually edited codes remain stable. It outputs `value`,
 `color_name`, `hex`, and `color_code`.
+
+### Endorphin Etsy Stage Save
+One convention-aware PNG save node for all Etsy stages. It takes `images` and
+`context`, then uses fixed prefix/suffix dropdowns: `artwork`, `base`,
+`mockup`, or `candidate`; and `none`, `transparent`, `print`, or `emb`.
+Connect `color_code` for colorway filenames. Choosing `candidate` on a Redesign
+context allocates missing letters before advancing, returning candidate letters,
+product IDs, and saved paths.
 
 ### Legacy Etsy nodes
 **Endorphin Etsy Listing Image Loader (Legacy)**, **Endorphin Etsy Listing Save
