@@ -51,4 +51,4 @@ class EndorphinEtsyListingSelector:
 
 
 NODE_CLASS_MAPPINGS = {"EndorphinEtsyListingSelector": EndorphinEtsyListingSelector}
-NODE_DISPLAY_NAME_MAPPINGS = {"EndorphinEtsyListingSelector": "Endorphin Etsy Listing Selector"}
+NODE_DISPLAY_NAME_MAPPINGS = {"EndorphinEtsyListingSelector": "Endorphin Etsy Listing Selector (Legacy)"}

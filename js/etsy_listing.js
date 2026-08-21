@@ -94,6 +94,8 @@ const paletteNodes = {
     EndorphinEtsyListingImageLoader: ["asset_folder", "Folder"],
     EndorphinEtsyListingSaveImage: ["asset_folder", "Folder"],
     EndorphinEtsyListingSelector: ["design_phase", "Phase"],
+    EndorphinEtsyWorkflowTypeSelector: ["workflow_type", "Workflow Type"],
+    EndorphinEtsySourceTypeSelector: ["source_type", "Source Type"],
 };
 
 app.registerExtension({ name: "endorphin.EtsyListing", async beforeRegisterNodeDef(nodeType, nodeData) {

@@ -12,7 +12,7 @@ DEFAULT_PALETTE = {
 
 
 class EndorphinColorPalettePicker:
-    """Select a configurable color swatch and return its assigned integer."""
+    """Legacy palette picker retained for existing workflows."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -20,7 +20,7 @@ class EndorphinColorPalettePicker:
             "required": {
                 "palette": ("ENDORPHIN_COLOR_PALETTE", {
                     "default": json.dumps(DEFAULT_PALETTE, separators=(",", ":")),
-                    "tooltip": "Configure and select color slots directly in the node.",
+                    "tooltip": "Legacy palette picker. Use Endorphin Etsy Color Palette for new Etsy workflows.",
                 }),
             },
         }
@@ -53,5 +53,5 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "EndorphinColorPalettePicker": "Endorphin Color Palette Picker",
+    "EndorphinColorPalettePicker": "Endorphin Color Palette Picker (Legacy)",
 }

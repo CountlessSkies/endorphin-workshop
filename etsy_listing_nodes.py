@@ -71,6 +71,6 @@ NODE_CLASS_MAPPINGS = {
     "EndorphinEtsyListingSaveImage": EndorphinEtsyListingSaveImage,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "EndorphinEtsyListingImageLoader": "Endorphin Etsy Listing Image Loader",
-    "EndorphinEtsyListingSaveImage": "Endorphin Etsy Listing Save Image",
+    "EndorphinEtsyListingImageLoader": "Endorphin Etsy Listing Image Loader (Legacy)",
+    "EndorphinEtsyListingSaveImage": "Endorphin Etsy Listing Save Image (Legacy)",
 }

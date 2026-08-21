@@ -3,15 +3,29 @@ import { app } from "../../../scripts/app.js";
 const DEFAULT_PALETTE = {
     selected: 0,
     colors: [
-        { name: "Red", hex: "#EF4444", value: 1 },
-        { name: "Green", hex: "#22C55E", value: 2 },
-        { name: "Blue", hex: "#3B82F6", value: 3 },
+        { name: "Red", hex: "#EF4444", code: "RED", value: 1 },
+        { name: "Green", hex: "#22C55E", code: "GRN", value: 2 },
+        { name: "Blue", hex: "#3B82F6", code: "BLU", value: 3 },
     ],
 };
-const MIN_NODE_WIDTH = 470;
+const MIN_NODE_WIDTH = 540;
 
 function normalizeHex(value) {
     return /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : "#808080";
+}
+
+function suggestColorCode(name) {
+    const words = String(name || "").toUpperCase().match(/[A-Z]+/g) || [];
+    if (!words.length) return "CLR";
+    if (words.length >= 3) return words.slice(0, 3).map((word) => word[0]).join("");
+    if (words.length === 2) {
+        const consonants = words[1].replace(/[AEIOU]/g, "");
+        if (consonants.length >= 2) return `${words[0][0]}${consonants.slice(0, 2)}`;
+        return `${words[0][0]}${words[1].slice(0, 2)}`.padEnd(3, words[0][0]);
+    }
+    const consonants = words[0].replace(/[AEIOU]/g, "");
+    if (consonants.length >= 3) return consonants.slice(0, 3);
+    return words[0].slice(0, 3).padEnd(3, "X");
 }
 
 function parsePalette(value) {
@@ -21,6 +35,8 @@ function parsePalette(value) {
         const normalized = colors.map((color, index) => ({
             name: String(color?.name || `Color ${index + 1}`),
             hex: normalizeHex(String(color?.hex || "")),
+            code: /^[A-Z]{3}$/.test(String(color?.code || "").toUpperCase()) ? String(color.code).toUpperCase() : suggestColorCode(color?.name),
+            code_auto: typeof color?.code_auto === "boolean" ? color.code_auto : !color?.code,
             value: Number.isInteger(Number(color?.value)) ? Number(color.value) : index + 1,
         }));
         return {
@@ -40,16 +56,20 @@ function parsePaletteList(text) {
         if (!line) continue;
         const match = line.match(/^(.+?)\s*\(\s*hex\s*(#[0-9a-f]{6})\s*\)\s*(?:[=:]\s*(-?\d+))?\s*$/i);
         if (!match) errors.push(index + 1);
-        else colors.push({ name: match[1].trim(), hex: match[2].toUpperCase(), value: match[3] === undefined ? colors.length + 1 : Number(match[3]) });
+        else {
+            const name = match[1].trim();
+            colors.push({ name, hex: match[2].toUpperCase(), code: suggestColorCode(name), code_auto: true, value: match[3] === undefined ? colors.length + 1 : Number(match[3]) });
+        }
     }
     return { colors, errors };
 }
 
-function createPaletteWidget(node, inputName, inputData) {
+function createPaletteWidget(node, inputName, inputData, showCode = false) {
+    const minNodeWidth = showCode ? MIN_NODE_WIDTH : 470;
     let palette = parsePalette(inputData?.[1]?.default);
     let showImporter = false;
     const root = document.createElement("div");
-    root.style.cssText = "box-sizing:border-box;width:100%;padding:6px;background:#202020;color:#ddd;font:12px sans-serif;";
+    root.style.cssText = "box-sizing:border-box;width:100%;padding:7px;background:#202020;color:#ddd;font:12px sans-serif;";
     root.addEventListener("pointerdown", (event) => event.stopPropagation());
 
     const widget = node.addDOMWidget(inputName, "ENDORPHIN_COLOR_PALETTE", root, {
@@ -60,13 +80,13 @@ function createPaletteWidget(node, inputName, inputData) {
             requestAnimationFrame(resize);
         },
         getMinHeight: () => palette.colors.length * 34 + (showImporter ? 210 : 72),
-        getMinWidth: () => MIN_NODE_WIDTH,
+        getMinWidth: () => minNodeWidth,
     });
 
     function resize() {
         const computedSize = node.computeSize();
         node.setSize([
-            Math.max(MIN_NODE_WIDTH, node.size[0], computedSize[0]),
+            Math.max(minNodeWidth, node.size[0], computedSize[0]),
             computedSize[1],
         ]);
         node.graph?.setDirtyCanvas(true, true);
@@ -80,7 +100,7 @@ function createPaletteWidget(node, inputName, inputData) {
     function button(text) {
         const element = document.createElement("button");
         element.textContent = text;
-        element.style.cssText = "border:1px solid #566;background:#303030;color:#bde3ff;border-radius:3px;padding:4px 7px;cursor:pointer;font:12px sans-serif;";
+        element.style.cssText = "border:1px solid #666;background:#303030;color:#d9f0ff;border-radius:3px;padding:4px 7px;cursor:pointer;font:12px sans-serif;";
         return element;
     }
 
@@ -88,11 +108,14 @@ function createPaletteWidget(node, inputName, inputData) {
         root.replaceChildren();
         palette.colors.forEach((color, index) => {
             const row = document.createElement("div");
-            row.style.cssText = `display:grid;grid-template-columns:48px minmax(110px,1fr) 90px 48px 26px 26px 26px;gap:5px;align-items:center;height:31px;margin-bottom:4px;padding:2px;border:1px solid ${index === palette.selected ? "#8ed0ff" : "#555"};background:${index === palette.selected ? "#294b67" : "#292929"};`;
+            const columns = showCode
+                ? "48px minmax(100px,1fr) 90px 48px 42px 26px 26px 26px"
+                : "48px minmax(110px,1fr) 90px 48px 26px 26px 26px";
+            row.style.cssText = `display:grid;grid-template-columns:${columns};gap:5px;align-items:center;height:32px;margin-bottom:5px;padding:3px;border:1px solid ${index === palette.selected ? "#8ed0ff" : "#666"};border-radius:3px;background:${index === palette.selected ? "#29526f" : "#303030"};`;
             const preview = document.createElement("button");
             preview.type = "button";
             preview.title = "Select this color. Edit the HEX field to change its color.";
-            preview.style.cssText = `width:44px;height:25px;padding:0;border:1px solid #aaa;border-radius:2px;background:${color.hex};cursor:pointer;`;
+            preview.style.cssText = `width:44px;height:25px;padding:0;border:1px solid #aaa;border-radius:3px;background:${color.hex};cursor:pointer;`;
             preview.onclick = (event) => {
                 event.stopPropagation();
                 palette.selected = index;
@@ -104,11 +127,15 @@ function createPaletteWidget(node, inputName, inputData) {
             const hex = document.createElement("input");
             hex.value = color.hex;
             hex.placeholder = "#RRGGBB";
+            const code = document.createElement("input");
+            code.value = color.code;
+            code.placeholder = "MTP";
+            code.title = "Stable three-letter color code used by the image pipeline.";
             const int = document.createElement("input");
             int.type = "number";
             int.step = "1";
             int.value = String(color.value);
-            [name, hex, int].forEach((input) => {
+            [name, hex, code, int].forEach((input) => {
                 input.style.cssText = "min-width:0;box-sizing:border-box;width:100%;border:1px solid #666;border-radius:2px;padding:3px;background:#171717;color:#eee;font:12px sans-serif;";
                 // LiteGraph's canvas normally consumes these events. Stop all
                 // of them on editable controls so typing works reliably.
@@ -116,13 +143,26 @@ function createPaletteWidget(node, inputName, inputData) {
                     input.addEventListener(eventName, (event) => event.stopPropagation());
                 }
             });
-            name.onchange = () => { color.name = name.value.trim() || color.name; commit(); };
+            name.onchange = () => {
+                color.name = name.value.trim() || color.name;
+                if (color.code_auto) {
+                    color.code = suggestColorCode(color.name);
+                    code.value = color.code;
+                }
+                commit();
+            };
             name.onblur = name.onchange;
             hex.onchange = () => {
                 if (/^#[0-9a-f]{6}$/i.test(hex.value.trim())) { color.hex = hex.value.trim().toUpperCase(); preview.style.background = color.hex; commit(); }
                 else hex.value = color.hex;
             };
             hex.onblur = hex.onchange;
+            code.onchange = () => {
+                const normalized = code.value.trim().toUpperCase();
+                if (/^[A-Z]{3}$/.test(normalized)) { color.code = normalized; color.code_auto = false; code.value = normalized; commit(); }
+                else code.value = color.code;
+            };
+            code.onblur = code.onchange;
             int.onchange = () => {
                 if (Number.isInteger(Number(int.value))) { color.value = Number(int.value); commit(); }
                 else int.value = String(color.value);
@@ -160,7 +200,9 @@ function createPaletteWidget(node, inputName, inputData) {
                 commit();
             };
             row.onclick = () => { palette.selected = index; commit(); };
-            row.append(preview, name, hex, int, moveUp, moveDown, remove);
+            row.append(preview, name, hex);
+            if (showCode) row.append(code);
+            row.append(int, moveUp, moveDown, remove);
             root.appendChild(row);
         });
         const actions = document.createElement("div");
@@ -168,7 +210,8 @@ function createPaletteWidget(node, inputName, inputData) {
         const add = button("+ Add Color");
         add.onclick = () => {
             const value = Math.max(0, ...palette.colors.map((color) => color.value)) + 1;
-            palette.colors.push({ name: `Color ${palette.colors.length + 1}`, hex: "#808080", value });
+            const name = `Color ${palette.colors.length + 1}`;
+            palette.colors.push({ name, hex: "#808080", code: suggestColorCode(name), code_auto: true, value });
             palette.selected = palette.colors.length - 1;
             commit();
         };
@@ -216,14 +259,15 @@ function createPaletteWidget(node, inputName, inputData) {
     // frame so a freshly created or restored node cannot be narrower than its
     // row controls.
     requestAnimationFrame(resize);
-    return { widget, minWidth: MIN_NODE_WIDTH, minHeight: 174 };
+    return { widget, minWidth: minNodeWidth, minHeight: 174 };
 }
 
 app.registerExtension({
     name: "endorphin.ColorPalettePicker",
     getCustomWidgets() {
         return {
-            ENDORPHIN_COLOR_PALETTE: createPaletteWidget,
+            ENDORPHIN_COLOR_PALETTE: (node, inputName, inputData) => createPaletteWidget(node, inputName, inputData, false),
+            ENDORPHIN_ETSY_COLOR_PALETTE: (node, inputName, inputData) => createPaletteWidget(node, inputName, inputData, true),
         };
     },
 });
