@@ -86,12 +86,12 @@ while typing; manually edited codes remain stable. It outputs `value`,
 `color_name`, `hex`, and `color_code`.
 
 ### Endorphin Etsy Stage Save
-One convention-aware PNG save node for all Etsy stages. It takes `images` and
-`context`, then uses fixed prefix/suffix dropdowns: `artwork`, `base`,
-`mockup`, or `candidate`; and `none`, `transparent`, `print`, or `emb`.
-Connect `color_code` for colorway filenames. Choosing `candidate` on a Redesign
-context allocates missing letters before advancing, returning candidate letters,
-product IDs, and saved paths.
+One convention-aware PNG save node for all Etsy stages. Select one of the six
+Project Selector routes and the node applies its fixed prefix/suffix convention;
+the selected save stage must match the route in `context`. Both Redesign
+Candidate stages allocate `candidate_<ID>A`, `candidate_<ID>B`… slots, filling
+missing unapproved letters first and never overwriting approved candidates.
+Colorway stages use `color_code` from the context when creating filenames.
 
 ### Legacy Etsy nodes
 **Endorphin Etsy Listing Image Loader (Legacy)**, **Endorphin Etsy Listing Save
