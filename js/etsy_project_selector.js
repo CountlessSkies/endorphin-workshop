@@ -83,13 +83,14 @@ function createProjectSelector(node, inputName, inputData) {
     const candidatePreviewHeight = (allowApproval) => {
         const selected = candidates.find((candidate) => candidate.letter === project.candidate_letter);
         let height = candidates.length ? 56 : 42; // Heading + candidate buttons/empty hint.
-        if (selected) height += 82 + (allowApproval && !selected.approved ? 28 : 0);
+        if (selected) height += 540 + (allowApproval && !selected.approved ? 28 : 0);
         return height;
     };
     const contentMinHeight = () => {
         let height = 300; // Project root through Route, including root padding.
-        if (["artwork_foundation", "artwork_stitchwork"].includes(project.route)) return height + stagePreviewHeight + 39;
-        if (["redesign_emb_candidate", "redesign_print_candidate"].includes(project.route)) return height + candidatePreviewHeight(false);
+        if (["artwork_foundation", "artwork_stitchwork"].includes(project.route)) return height + (stagePreviewHeight + 39) * 2;
+        if (project.route === "artwork_colorway") return height + stagePreviewHeight + 39;
+        if (["redesign_emb_candidate", "redesign_print_candidate"].includes(project.route)) return height + stagePreviewHeight + 39 + candidatePreviewHeight(false);
         if (!project.route.endsWith("colorway")) return height;
 
         if (project.route === "redesign_colorway") {
@@ -121,6 +122,14 @@ function createProjectSelector(node, inputName, inputData) {
         if (!project.candidate_letter) { status = "Select a candidate first."; render(); return; }
         loadingCandidates = true; render();
         try { const response = await fetch("/endorphin/etsy/candidates/approve", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root_folder: project.root_folder, project_id: project.project_id, candidate_letter: project.candidate_letter }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not approve candidate."); status = `Approved ${data.product_id}.`; await refreshCandidates(); } catch (error) { status = error.message || "Could not approve candidate."; } finally { loadingCandidates = false; render(); resize(); }
+    }
+    async function deleteCandidate() {
+        if (!project.candidate_letter) { status = "Select a candidate first."; render(); return; }
+        const candidate = candidates.find((item) => item.letter === project.candidate_letter);
+        const productId = candidate?.product_id || `${project.project_id}${project.candidate_letter}`;
+        if (!window.confirm(`Delete ${productId}, its candidate image, and all saved colorways? This cannot be undone.`)) return;
+        loadingCandidates = true; render();
+        try { const response = await fetch("/endorphin/etsy/candidates/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ root_folder: project.root_folder, project_id: project.project_id, candidate_letter: project.candidate_letter }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not delete candidate."); project.candidate_letter = ""; status = `Deleted ${data.product_id} and its colorways.`; commit(); await refreshCandidates(); } catch (error) { status = error.message || "Could not delete candidate."; } finally { loadingCandidates = false; render(); resize(); }
     }
     function renderHslEditor(color) {
         ensureHslSliderStyles();
@@ -182,20 +191,24 @@ function createProjectSelector(node, inputName, inputData) {
         }
         return section;
     }
-    function renderStagePreview() {
-        const names = { artwork_foundation: "base_<ID>_transparent", artwork_stitchwork: "base_<ID>_emb" };
-        const section = document.createElement("div"); section.append(label(`Stage output preview — ${names[project.route]}`));
+    function renderStagePreview(previewKind = "input") {
+        const names = { artwork_foundation: "artwork_<ID>_transparent", artwork_stitchwork: "base_<ID>_print", artwork_colorway: "base_<ID>_emb", redesign_emb_candidate: "source reference", redesign_print_candidate: "source reference" };
+        const titles = { artwork_foundation: "Foundation input preview", artwork_stitchwork: "Stitchwork input preview", artwork_colorway: "Colorway input preview", redesign_emb_candidate: "Candidate input preview", redesign_print_candidate: "Candidate input preview" };
+        const outputNames = { artwork_foundation: "base_<ID>_transparent", artwork_stitchwork: "base_<ID>_emb" };
+        const title = previewKind === "output" ? "Stage output preview" : titles[project.route];
+        const name = previewKind === "output" ? outputNames[project.route] : names[project.route];
+        const section = document.createElement("div"); section.append(label(`${title} — ${name}`));
         stagePreviewHeight = 240;
-        const preview = document.createElement("img"); preview.src = `/endorphin/etsy/stage-preview?${new URLSearchParams({ root_folder: project.root_folder, project_id: project.project_id, route: project.route })}`; preview.alt = `${project.route} output preview`; preview.style.cssText = "display:block;box-sizing:border-box;width:100%;height:auto;background:#171717;border:1px solid #666;border-radius:3px;";
+        const preview = document.createElement("img"); preview.src = `/endorphin/etsy/stage-preview?${new URLSearchParams({ root_folder: project.root_folder, project_id: project.project_id, route: project.route, preview_kind: previewKind })}`; preview.alt = `${project.route} ${previewKind} preview`; preview.style.cssText = "display:block;box-sizing:border-box;width:100%;height:auto;background:#171717;border:1px solid #666;border-radius:3px;";
         preview.onload = () => { stagePreviewHeight = Math.max(120, preview.offsetHeight); requestAnimationFrame(resize); };
-        preview.onerror = () => { const message = document.createElement("div"); message.textContent = `No output yet — this stage has not created ${names[project.route]}.`; message.style.cssText = `box-sizing:border-box;width:100%;height:${stagePreviewHeight}px;padding:8px;display:flex;align-items:center;background:#171717;border:1px dashed #666;border-radius:3px;color:#aab8c5;font-size:11px;`; preview.replaceWith(message); requestAnimationFrame(resize); };
+        preview.onerror = () => { const message = document.createElement("div"); message.textContent = `No ${previewKind} available — expected ${name}.`; message.style.cssText = `box-sizing:border-box;width:100%;height:${stagePreviewHeight}px;padding:8px;display:flex;align-items:center;background:#171717;border:1px dashed #666;border-radius:3px;color:#aab8c5;font-size:11px;`; preview.replaceWith(message); requestAnimationFrame(resize); };
         section.append(preview); return section;
     }
     function renderCandidateSelector(allowApproval = false) {
         const section = document.createElement("div"); section.append(label(allowApproval ? "Redesign candidate" : "Generated candidates preview"));
         if (loadingCandidates) section.append(document.createTextNode("Loading candidates…"));
         else if (!candidates.length) section.append(document.createTextNode("No candidate output yet — this stage has not run."));
-        else { const row = document.createElement("div"); row.style.cssText = "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;"; for (const candidate of candidates) row.append(card(`${candidate.letter} ${candidate.approved ? "✓" : ""}`, project.candidate_letter === candidate.letter, () => { project.candidate_letter = candidate.letter; commit(); render(); })); section.append(row); const selected = candidates.find((candidate) => candidate.letter === project.candidate_letter); if (selected) { const details = document.createElement("div"); details.style.cssText = "display:grid;grid-template-columns:100px minmax(0,1fr);gap:8px;margin-top:6px;align-items:center;"; const preview = document.createElement("img"); preview.src = selected.preview_url; preview.alt = `${selected.product_id} preview`; preview.style.cssText = "width:100px;height:76px;object-fit:contain;background:#171717;border:1px solid #666;border-radius:3px;"; const info = document.createElement("div"); info.textContent = allowApproval ? (selected.approved ? `${selected.product_id} is approved and ready for Colorway.` : `${selected.product_id} is unapproved. Approve it before Colorway can run.`) : `${selected.product_id} candidate output.`; details.append(preview, info); section.append(details); if (allowApproval && !selected.approved) section.append(button("Approve selected candidate", approveCandidate, loadingCandidates)); } }
+        else { const row = document.createElement("div"); row.style.cssText = "display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;"; for (const candidate of candidates) row.append(card(`${candidate.letter} ${candidate.approved ? "✓" : ""}`, project.candidate_letter === candidate.letter, () => { project.candidate_letter = candidate.letter; commit(); render(); })); section.append(row); const selected = candidates.find((candidate) => candidate.letter === project.candidate_letter); if (selected) { const details = document.createElement("div"); details.style.cssText = "display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px;"; const preview = document.createElement("img"); preview.src = selected.preview_url; preview.alt = `${selected.product_id} preview`; preview.style.cssText = "display:block;box-sizing:border-box;width:100%;height:auto;background:#171717;border:1px solid #666;border-radius:3px;"; const info = document.createElement("div"); info.textContent = allowApproval ? (selected.approved ? `${selected.product_id} is approved and ready for Colorway.` : `${selected.product_id} is unapproved. Approve it before Colorway can run.`) : `${selected.product_id} candidate output.`; details.append(preview, info); section.append(details); if (allowApproval && !selected.approved) section.append(button("Approve selected candidate", approveCandidate, loadingCandidates)); section.append(button("Delete candidate + colorways", deleteCandidate, loadingCandidates)); } }
         return section;
     }
     function render() {
@@ -206,7 +219,8 @@ function createProjectSelector(node, inputName, inputData) {
         const hint = document.createElement("div"); hint.textContent = status || `Pick an existing ID, or create the next ${project.creation_period}NNN ID automatically.`; hint.style.cssText = "min-height:15px;margin-top:3px;color:#aab8c5;font-size:11px;"; root.append(hint); root.append(label("Route"));
         if (project.workflow_type === "artwork") root.append(cards([["artwork_foundation", "Foundation"], ["artwork_stitchwork", "Stitchwork"], ["artwork_colorway", "Colorway"]], project.route, (value) => { project.route = value; project.source_type = "idea_artwork"; }));
         else root.append(cards([["redesign_emb_candidate", "Embroidery candidate"], ["redesign_print_candidate", "Print candidate"], ["redesign_colorway", "Colorway"]], project.route, (value) => { project.route = value; project.source_type = value === "redesign_print_candidate" ? "print_reference" : value === "redesign_emb_candidate" ? "embroidery_reference" : "approved_candidate"; refreshCandidates(); }));
-        if (["artwork_foundation", "artwork_stitchwork"].includes(project.route)) root.append(renderStagePreview());
+        if (["artwork_foundation", "artwork_stitchwork", "artwork_colorway", "redesign_emb_candidate", "redesign_print_candidate"].includes(project.route)) root.append(renderStagePreview());
+        if (["artwork_foundation", "artwork_stitchwork"].includes(project.route)) root.append(renderStagePreview("output"));
         if (["redesign_emb_candidate", "redesign_print_candidate"].includes(project.route)) root.append(renderCandidateSelector());
         if (project.route === "redesign_colorway") root.append(renderCandidateSelector(true)); if (project.route.endsWith("colorway")) root.append(renderPalette());
     }

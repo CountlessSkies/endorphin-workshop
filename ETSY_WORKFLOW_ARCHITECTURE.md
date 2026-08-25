@@ -346,6 +346,27 @@ candidate_RD2608001B.png
 The allocator should reserve a selected slot before writing its file so that two
 near-simultaneous saves cannot choose the same letter.
 
+### Candidate file and preview operations
+
+The candidate filename is deliberately neutral; it does not include `_emb`:
+
+```text
+candidate_RD2608001A.png
+```
+
+Both Embroidery Reference and Print Reference create this same embroidery
+candidate format. Their source distinction remains in `project.json`, not in
+the candidate filename. Project Selector previews the route input before a run,
+then previews generated candidates. A rebuilt candidate must receive a new
+preview revision so the browser never reuses the thumbnail of a deleted file.
+
+Candidate deletion is a project operation: deleting letter `A` deletes its
+candidate file, its `RD...A/` product folder and every colorway inside it, and
+removes `A` from `approved_candidates`. It requires an explicit confirmation.
+
+Source discovery accepts PNG, JPG/JPEG, WEBP, AVIF, BMP, TIFF, and GIF (first
+frame), allowing supplied marketplace references such as AVIF files.
+
 ### Project manifest
 
 The filesystem remains the source of the actual assets. Each project also keeps

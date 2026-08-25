@@ -9,6 +9,7 @@ source of truth.
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from urllib.parse import quote
 
@@ -27,7 +28,8 @@ ARTWORK_STATE_TYPE = "ENDORPHIN_ETSY_ARTWORK_STATE"
 ROUTE_TYPE = "ENDORPHIN_ETSY_ROUTE"
 DEFAULT_ROOT = r"G:\My Drive\_Etsy\_Listing"
 MANIFEST_NAME = "project.json"
-CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+# Formats supported by the bundled Pillow runtime; GIF uses its first frame.
+CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".bmp", ".tif", ".tiff", ".gif"}
 ETSY_STAGE_ROUTES = (
     "artwork_foundation",
     "artwork_stitchwork",
@@ -126,12 +128,13 @@ def candidate_payload(root_folder, project_id):
     approved = set(manifest["approved_candidates"])
     result = []
     for letter, path in sorted(candidate_paths(project_dir, project_id).items()):
+        revision = path.stat().st_mtime_ns
         result.append({
             "letter": letter,
             "product_id": f"{project_id}{letter}",
             "approved": letter in approved,
             "path": str(path),
-            "preview_url": f"/endorphin/etsy/candidate-preview?root_folder={quote(root_folder, safe='')}&project_id={project_id}&letter={letter}",
+            "preview_url": f"/endorphin/etsy/candidate-preview?root_folder={quote(root_folder, safe='')}&project_id={project_id}&letter={letter}&v={revision}",
         })
     return context, result
 
@@ -168,6 +171,34 @@ async def approve_etsy_candidate(request):
         return web.json_response({"error": str(error)}, status=400)
 
 
+@PromptServer.instance.routes.post("/endorphin/etsy/candidates/delete")
+async def delete_etsy_candidate(request):
+    """Delete a candidate, its product colorways, and its approval record."""
+    try:
+        data = await request.json()
+        root_folder = str(data.get("root_folder", "")).strip() or DEFAULT_ROOT
+        project_id = str(data.get("project_id", "")).strip()
+        letter = normalize_letter(data.get("candidate_letter"))
+        context, _candidates = candidate_payload(root_folder, project_id)
+        project_dir = Path(context["project_path"]).resolve()
+        candidate = candidate_paths(project_dir, context["project_id"]).get(letter)
+        if candidate is None:
+            raise ValueError(f"Candidate {letter} does not exist on disk.")
+        candidate = candidate.resolve()
+        product_dir = (project_dir / f"{context['project_id']}{letter}").resolve()
+        if candidate.parent != project_dir or product_dir.parent != project_dir:
+            raise ValueError("Candidate delete target is outside its project folder.")
+        candidate.unlink()
+        if product_dir.is_dir():
+            shutil.rmtree(product_dir)
+        manifest = load_manifest(project_dir, context)
+        manifest["approved_candidates"] = [item for item in manifest["approved_candidates"] if item != letter]
+        write_manifest(project_dir, manifest)
+        return web.json_response({"deleted": letter, "product_id": f"{context['project_id']}{letter}"})
+    except (ValueError, OSError, json.JSONDecodeError) as error:
+        return web.json_response({"error": str(error)}, status=400)
+
+
 @PromptServer.instance.routes.get("/endorphin/etsy/candidate-preview")
 async def etsy_candidate_preview(request):
     try:
@@ -183,14 +214,28 @@ async def etsy_candidate_preview(request):
         return web.json_response({"error": str(error)}, status=400)
 
 
-def stage_preview_path(root_folder, project_id, route):
+def stage_preview_path(root_folder, project_id, route, preview_kind="input"):
     project_id = normalize_identifier(project_id, "Project ID")
-    preview_stems = {
+    input_stems = {
+        "artwork_foundation": [f"artwork_{project_id}_transparent", f"artwork_{project_id}"],
+        "artwork_stitchwork": [f"base_{project_id}_print"],
+        "artwork_colorway": [f"base_{project_id}_emb"],
+    }
+    output_stems = {
         "artwork_foundation": [f"base_{project_id}_transparent"],
         "artwork_stitchwork": [f"base_{project_id}_emb"],
     }
+    if route in {"redesign_emb_candidate", "redesign_print_candidate"}:
+        if not project_id.startswith("RD"):
+            raise ValueError("Redesign candidate previews require a Redesign project ID.")
+        source_dir = Path(root_folder).expanduser() / "redesign" / project_id / "source"
+        files = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=lambda path: path.name.casefold()) if source_dir.is_dir() else []
+        if files:
+            return files[0]
+        raise ValueError(f"Candidate input is missing. Expected an image in: {source_dir}")
+    preview_stems = input_stems if preview_kind == "input" else output_stems
     if route not in preview_stems:
-        raise ValueError("Preview is available only for Artwork Foundation or Stitchwork.")
+        raise ValueError("Preview is available only for Artwork stages or Redesign Candidate.")
     if project_id.startswith("RD"):
         raise ValueError("Artwork stage previews require an Artwork project ID.")
     project_dir = Path(root_folder).expanduser() / "artwork" / project_id
@@ -210,7 +255,8 @@ async def etsy_stage_preview(request):
         root_folder = str(request.query.get("root_folder", "")).strip() or DEFAULT_ROOT
         project_id = str(request.query.get("project_id", "")).strip()
         route = str(request.query.get("route", "")).strip()
-        return web.FileResponse(stage_preview_path(root_folder, project_id, route))
+        preview_kind = str(request.query.get("preview_kind", "input")).strip().lower()
+        return web.FileResponse(stage_preview_path(root_folder, project_id, route, preview_kind))
     except (ValueError, OSError, json.JSONDecodeError) as error:
         return web.json_response({"error": str(error)}, status=404)
 
@@ -478,6 +524,11 @@ class EndorphinEtsyProjectSelector:
     RETURN_NAMES = ("context", "color_name", "color_hex", "color_code", "stage_input_image")
     FUNCTION = "select"
     CATEGORY = "Endorphin Workshop/Etsy"
+
+    @classmethod
+    def IS_CHANGED(cls, project):
+        """A repeated Queue Prompt must re-evaluate the selected route, not cache it."""
+        return float("nan")
 
     def select(self, project):
         try:
