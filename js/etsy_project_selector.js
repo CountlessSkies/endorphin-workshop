@@ -19,7 +19,7 @@ function suggestColorCode(name) {
 }
 function normalizePalette(value) {
     const colors = Array.isArray(value?.colors) ? value.colors : DEFAULT_PALETTE.colors;
-    const normalized = colors.map((color, index) => ({ name: String(color?.name || `Color ${index + 1}`), hex: normalizeHex(String(color?.hex || "")), code: /^[A-Z]{3}$/.test(String(color?.code || "").toUpperCase()) ? String(color.code).toUpperCase() : suggestColorCode(color?.name), code_auto: typeof color?.code_auto === "boolean" ? color.code_auto : !color?.code, value: Number.isInteger(Number(color?.value)) ? Number(color.value) : index + 1 }));
+    const normalized = colors.map((color, index) => ({ name: String(color?.name || `Color ${index + 1}`), hex: normalizeHex(String(color?.hex || "")), code: /^[A-Z]{3}$/.test(String(color?.code || "").toUpperCase()) ? String(color.code).toUpperCase() : suggestColorCode(color?.name), code_auto: typeof color?.code_auto === "boolean" ? color.code_auto : !color?.code, value: index + 1 }));
     return { selected: Math.max(0, Math.min(Number(value?.selected) || 0, Math.max(0, normalized.length - 1))), colors: normalized };
 }
 function parsePaletteList(text) {
@@ -28,9 +28,10 @@ function parsePaletteList(text) {
         const line = rawLine.trim(); if (!line) continue;
         const hexes = line.match(/#[0-9a-f]{6}\b/gi) || [];
         if (hexes.length !== 1) { errors.push(index + 1); continue; }
-        const valueMatch = line.match(/(?:^|\s)[=:|]\s*(-?\d+)\s*$/);
-        const value = valueMatch ? Number(valueMatch[1]) : colors.length + 1;
-        const name = line
+        const codeMatch = line.match(/\|\s*([A-Z]{3})\s*$/i);
+        const withoutCode = codeMatch ? line.slice(0, codeMatch.index).trim() : line;
+        const valueMatch = withoutCode.match(/(?:^|\s)[=:|]\s*(-?\d+)\s*$/);
+        const name = withoutCode
             .replace(hexes[0], "")
             .replace(valueMatch?.[0] || "", "")
             .replace(/\bhex\b/gi, "")
@@ -38,9 +39,15 @@ function parsePaletteList(text) {
             .replace(/[,:;|]+/g, " ")
             .replace(/\s+/g, " ")
             .trim() || `Color ${colors.length + 1}`;
-        colors.push({ name, hex: hexes[0].toUpperCase(), code: suggestColorCode(name), code_auto: true, value });
+        colors.push({ name, hex: hexes[0].toUpperCase(), code: codeMatch ? codeMatch[1].toUpperCase() : suggestColorCode(name), code_auto: !codeMatch, value: colors.length + 1 });
     }
     return { colors, errors };
+}
+function paletteListText(palette) { return palette.colors.map((color) => `${color.name} (hex ${color.hex}) | ${color.value} | ${color.code}`).join("\n"); }
+function reindexPaletteValues(palette) { palette.colors.forEach((color, index) => { color.value = index + 1; }); }
+async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch { const area = document.createElement("textarea"); area.value = text; area.style.cssText = "position:fixed;opacity:0;"; document.body.append(area); area.select(); const copied = document.execCommand("copy"); area.remove(); return copied; }
 }
 function hexToHsl(hex) {
     const value = normalizeHex(hex).slice(1); const red = parseInt(value.slice(0, 2), 16) / 255, green = parseInt(value.slice(2, 4), 16) / 255, blue = parseInt(value.slice(4, 6), 16) / 255;
@@ -168,26 +175,24 @@ function createProjectSelector(node, inputName, inputData) {
     function renderPalette() {
         const section = document.createElement("div"); section.append(label("Color palette"));
         project.palette.colors.forEach((color, index) => {
-            const selected = index === project.palette.selected, row = document.createElement("div"); row.style.cssText = `box-sizing:border-box;display:grid;grid-template-columns:44px minmax(90px,1fr) 72px 48px 42px 22px 22px 34px 26px;gap:5px;align-items:center;height:38px;margin-bottom:5px;padding:3px;border:1px solid ${selected ? "#8ed0ff" : "#666"};border-radius:3px;background:${selected ? "#29526f" : "#303030"};`;
+            const selected = index === project.palette.selected, row = document.createElement("div"); row.style.cssText = `box-sizing:border-box;display:grid;grid-template-columns:44px minmax(90px,1fr) 72px 48px 32px 26px 26px 34px 26px;gap:5px;align-items:center;height:38px;margin-bottom:5px;padding:3px;border:1px solid ${selected ? "#8ed0ff" : "#666"};border-radius:3px;background:${selected ? "#29526f" : "#303030"};`;
             const swatch = button("", () => { project.palette.selected = index; commit(); render(); }); swatch.title = "Select color"; swatch.style.cssText = `height:25px;padding:0;border:1px solid #aaa;border-radius:3px;background:${color.hex};cursor:pointer;`;
             const name = editableInput(color.name, "Color name", (value) => { color.name = value || color.name; if (color.code_auto) color.code = suggestColorCode(color.name); commit(); render(); });
             const hex = editableInput(color.hex, "#RRGGBB", (value) => { if (/^#[0-9a-f]{6}$/i.test(value)) { color.hex = value.toUpperCase(); commit(); render(); } });
             const code = editableInput(color.code, "MTP", (value) => { if (/^[A-Z]{3}$/i.test(value)) { color.code = value.toUpperCase(); color.code_auto = false; commit(); } });
-            const numberWrap = document.createElement("div"); numberWrap.style.cssText = "position:relative;height:25px;min-width:0;";
-            const number = document.createElement("input"); number.type = "number"; number.className = "endorphin-palette-number"; number.step = "1"; number.value = String(color.value); number.style.cssText = "box-sizing:border-box;min-width:0;width:100%;height:25px;background:#171717;color:#eee;border:1px solid #666;border-radius:5px;padding:3px 17px 3px 5px;font:12px sans-serif;"; stopCanvasEvents(number); number.onchange = () => { if (Number.isInteger(Number(number.value))) { color.value = Number(number.value); commit(); } else number.value = String(color.value); };
-            const adjustValue = (amount) => { color.value += amount; number.value = String(color.value); commit(); };
-            const spinner = document.createElement("div"); spinner.style.cssText = "position:absolute;top:2px;right:2px;bottom:2px;width:13px;display:grid;grid-template-rows:1fr 1fr;gap:1px;";
-            for (const [glyph, amount, title] of [["▲", 1, "Increase value"], ["▼", -1, "Decrease value"]]) { const control = document.createElement("button"); control.type = "button"; control.textContent = glyph; control.title = title; control.style.cssText = "padding:0;border:0;border-radius:3px;background:#31566e;color:#d9f0ff;cursor:pointer;font:7px sans-serif;line-height:8px;"; control.onclick = (event) => { event.stopPropagation(); adjustValue(amount); }; spinner.append(control); }
-            numberWrap.append(number, spinner);
-            const moveUp = button("↑", () => { if (index > 0) { [project.palette.colors[index - 1], project.palette.colors[index]] = [project.palette.colors[index], project.palette.colors[index - 1]]; project.palette.selected = index - 1; colorEditorIndex = null; commit(); render(); } }); moveUp.title = "Move color up"; moveUp.disabled = index === 0; moveUp.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
-            const moveDown = button("↓", () => { if (index < project.palette.colors.length - 1) { [project.palette.colors[index], project.palette.colors[index + 1]] = [project.palette.colors[index + 1], project.palette.colors[index]]; project.palette.selected = index + 1; colorEditorIndex = null; commit(); render(); } }); moveDown.title = "Move color down"; moveDown.disabled = index === project.palette.colors.length - 1; moveDown.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
+            const numberWrap = document.createElement("div"); numberWrap.style.cssText = "height:25px;min-width:0;";
+            const number = document.createElement("input"); number.type = "text"; number.readOnly = true; number.value = String(color.value); number.title = "Automatically numbered from the palette order"; number.style.cssText = "box-sizing:border-box;min-width:0;width:100%;height:25px;background:#202020;color:#bde3ff;border:1px solid #666;border-radius:5px;padding:3px 5px;text-align:center;font:12px sans-serif;"; stopCanvasEvents(number);
+            numberWrap.append(number);
+            const moveUp = button("↑", () => { if (index > 0) { [project.palette.colors[index - 1], project.palette.colors[index]] = [project.palette.colors[index], project.palette.colors[index - 1]]; reindexPaletteValues(project.palette); project.palette.selected = index - 1; colorEditorIndex = null; commit(); render(); } }); moveUp.title = "Move color up"; moveUp.disabled = index === 0; moveUp.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
+            const moveDown = button("↓", () => { if (index < project.palette.colors.length - 1) { [project.palette.colors[index], project.palette.colors[index + 1]] = [project.palette.colors[index + 1], project.palette.colors[index]]; reindexPaletteValues(project.palette); project.palette.selected = index + 1; colorEditorIndex = null; commit(); render(); } }); moveDown.title = "Move color down"; moveDown.disabled = index === project.palette.colors.length - 1; moveDown.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
             const hsl = button("HSL", () => { project.palette.selected = index; colorEditorIndex = colorEditorIndex === index ? null : index; commit(); render(); }); hsl.title = "Adjust this color with HSL sliders"; hsl.style.cssText = "height:24px;padding:1px 6px;border:1px solid #5b9dcc;border-radius:12px;background:#244a63;color:#d9f0ff;cursor:pointer;font:10px sans-serif;";
-            const remove = button("×", () => { project.palette.colors.splice(index, 1); project.palette.selected = Math.min(project.palette.selected, Math.max(0, project.palette.colors.length - 1)); colorEditorIndex = null; commit(); render(); }); remove.title = "Remove color"; remove.style.padding = "3px";
+            const remove = button("×", () => { project.palette.colors.splice(index, 1); reindexPaletteValues(project.palette); project.palette.selected = Math.min(project.palette.selected, Math.max(0, project.palette.colors.length - 1)); colorEditorIndex = null; commit(); render(); }); remove.title = "Remove color"; remove.style.padding = "3px";
             row.onclick = () => { project.palette.selected = index; commit(); render(); }; row.append(swatch, name, hex, code, numberWrap, moveUp, moveDown, hsl, remove); section.append(row); if (colorEditorIndex === index) section.append(renderHslEditor(color));
         });
         const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:6px;margin-top:2px;";
-        actions.append(button("+ Add Color", () => { const index = project.palette.colors.length + 1, name = `Color ${index}`, value = Math.max(0, ...project.palette.colors.map((color) => Number(color.value) || 0)) + 1; project.palette.colors.push({ name, hex: "#808080", code: suggestColorCode(name), code_auto: true, value }); project.palette.selected = project.palette.colors.length - 1; commit(); render(); }));
+        actions.append(button("+ Add Color", () => { const index = project.palette.colors.length + 1, name = `Color ${index}`; project.palette.colors.push({ name, hex: "#808080", code: suggestColorCode(name), code_auto: true, value: index }); project.palette.selected = project.palette.colors.length - 1; commit(); render(); }));
         actions.append(button(paletteImporter ? "Hide Paste" : "⇩ Paste List", () => { paletteImporter = !paletteImporter; render(); requestAnimationFrame(resize); })); section.append(actions);
+        const copy = button("⧉ Copy List", async () => { const copied = await copyText(paletteListText(project.palette)); copy.textContent = copied ? "Copied" : "Copy failed"; setTimeout(() => { copy.textContent = "⧉ Copy List"; }, 1200); }); actions.append(copy);
         if (paletteImporter) {
             const hint = document.createElement("div"); hint.textContent = "One color per line. Any format with one #RRGGBB works; optional value: | 1"; hint.style.cssText = "margin:8px 0 4px;color:#b9c7d5;";
             const textarea = document.createElement("textarea"); textarea.placeholder = "mocha taupe (hex #977D67)\n#D9DADE soft white\ncream, #E0DCC8 | 3"; textarea.style.cssText = "box-sizing:border-box;width:100%;height:110px;resize:vertical;border:1px solid #666;border-radius:3px;padding:5px;background:#171717;color:#eee;font:12px monospace;"; stopCanvasEvents(textarea);

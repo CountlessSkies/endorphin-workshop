@@ -40,6 +40,11 @@ ETSY_STAGE_ROUTES = (
 )
 
 
+def filename_sort_key(path):
+    """Keep a base filename ahead of its suffixed variants, regardless of extension."""
+    return (path.stem.casefold(), path.suffix.casefold())
+
+
 @PromptServer.instance.routes.get("/endorphin/etsy/projects")
 async def list_etsy_projects(request):
     """List direct project folders for the Project Selector's ID dropdown."""
@@ -229,7 +234,7 @@ def stage_preview_path(root_folder, project_id, route, preview_kind="input"):
         if not project_id.startswith("RD"):
             raise ValueError("Redesign candidate previews require a Redesign project ID.")
         source_dir = Path(root_folder).expanduser() / "redesign" / project_id / "source"
-        files = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=lambda path: path.name.casefold()) if source_dir.is_dir() else []
+        files = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=filename_sort_key) if source_dir.is_dir() else []
         if files:
             return files[0]
         raise ValueError(f"Candidate input is missing. Expected an image in: {source_dir}")
@@ -414,7 +419,7 @@ def stage_input_path(context):
         expected = project_dir / f"base_{project_id}_emb.png"
     elif route in {"redesign_emb_candidate", "redesign_print_candidate"}:
         source_dir = project_dir / "source"
-        paths = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=lambda path: path.name.casefold()) if source_dir.is_dir() else []
+        paths = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=filename_sort_key) if source_dir.is_dir() else []
         path = paths[0] if paths else None
         expected = source_dir
     elif route == "redesign_colorway":
@@ -896,7 +901,7 @@ class EndorphinEtsySourceAssetLoader:
             candidates = [path for path in candidates if path is not None]
         else:
             source_dir = project_dir / "source"
-            candidates = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=lambda path: path.name.casefold()) if source_dir.exists() else []
+            candidates = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=filename_sort_key) if source_dir.exists() else []
         if not candidates:
             if context["workflow_type"] == "artwork":
                 expected = project_dir / f"artwork_{context['project_id']}_transparent.png"
@@ -937,7 +942,7 @@ class EndorphinEtsyArtworkPrintMockupCheck:
                 "Manual print mockup is required before Artwork embroidery conversion. "
                 f"Create it first: {expected}"
             )
-        mockup_path = sorted(matches, key=lambda path: path.name.casefold())[0]
+        mockup_path = sorted(matches, key=filename_sort_key)[0]
         mockup_context = dict(context)
         mockup_context.update({"asset_stage": "print_mockup", "print_mockup_path": str(mockup_path)})
         return (load_image(mockup_path), mockup_context, str(mockup_path))
