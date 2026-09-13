@@ -50,16 +50,16 @@ paths stay consistent. The architecture and naming conventions are documented
 in [ETSY_WORKFLOW_ARCHITECTURE.md](ETSY_WORKFLOW_ARCHITECTURE.md).
 
 ### Endorphin Etsy Project Selector
-Choose **Artwork** or **Redesign**, then one route: Artwork Foundation,
-Stitchwork, Colorway; or Redesign Embroidery Candidate, Print Candidate,
+Choose **Artwork** or **Redesign**, then one route: Artwork Foundation, Mockup
+Placement, Stitchwork, Colorway; or Redesign Embroidery Candidate, Print Candidate,
 Colorway. The node emits a common `context` plus one matching route token.
 **Refresh** scans all direct project folders for the selected workflow and
 removes an ID from the picker when its folder no longer exists.
 
-The separate **Year** and **Month** dropdowns affect only **+ New**. That
-button creates the lowest available `YYMMNNN` ID for Artwork, or
-`RDYYMMNNN` for Redesign, plus its required folder skeleton. Existing-ID scans
-are never filtered by date. Artwork always uses the `Artwork` source; Redesign
+The **Year** and **Month** dropdowns filter the existing-ID picker to their
+matching `YYMM` period and also drive **+ New**. That button creates the lowest
+available `YYMMNNN` ID for Artwork, or `RDYYMMNNN` for Redesign, plus its
+required folder skeleton. Artwork always uses the `Artwork` source; Redesign
 also lets you choose `Embroidery reference` or `Print reference`.
 
 ### Endorphin Etsy Source Asset Loader
@@ -86,9 +86,8 @@ while typing; manually edited codes remain stable. It outputs `value`,
 `color_name`, `hex`, and `color_code`.
 
 ### Endorphin Etsy Stage Save
-One convention-aware PNG save node for all Etsy stages. Select one of the six
-Project Selector routes and the node applies its fixed prefix/suffix convention;
-the selected save stage must match the route in `context`. Both Redesign
+One convention-aware PNG save node for all Etsy stages. It resolves the fixed
+prefix/suffix convention from the selected route in `context`. Both Redesign
 Candidate stages allocate `candidate_<ID>A`, `candidate_<ID>B`… slots, filling
 missing unapproved letters first and never overwriting approved candidates.
 Colorway stages use `color_code` from the context when creating filenames.

@@ -32,6 +32,7 @@ MANIFEST_NAME = "project.json"
 CANDIDATE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif", ".bmp", ".tif", ".tiff", ".gif"}
 ETSY_STAGE_ROUTES = (
     "artwork_foundation",
+    "artwork_mockup",
     "artwork_stitchwork",
     "artwork_colorway",
     "redesign_emb_candidate",
@@ -47,16 +48,22 @@ def filename_sort_key(path):
 
 @PromptServer.instance.routes.get("/endorphin/etsy/projects")
 async def list_etsy_projects(request):
-    """List direct project folders for the Project Selector's ID dropdown."""
+    """List direct project folders, optionally filtered to one YYMM creation period."""
     root_folder = str(request.query.get("root_folder", "")).strip()
     workflow_type = str(request.query.get("workflow_type", "")).strip().lower()
+    period = str(request.query.get("period", "")).strip()
     if workflow_type not in {"artwork", "redesign"}:
         return web.json_response({"error": "workflow_type must be artwork or redesign."}, status=400)
+    if period and not re.fullmatch(r"\d{4}", period):
+        return web.json_response({"error": "Period must use YYMM format, for example 2608."}, status=400)
     if not root_folder:
         return web.json_response({"projects": []})
     try:
         directory = Path(root_folder).expanduser() / workflow_type
         projects = sorted((path.name for path in directory.iterdir() if path.is_dir()), key=str.casefold) if directory.is_dir() else []
+        if period:
+            pattern = re.compile(rf"^{re.escape(period)}\d{{3}}$" if workflow_type == "artwork" else rf"^RD{re.escape(period)}\d{{3}}$", re.IGNORECASE)
+            projects = [project_id for project_id in projects if pattern.fullmatch(project_id)]
     except OSError as error:
         return web.json_response({"error": str(error)}, status=400)
     return web.json_response({"projects": projects})
@@ -219,16 +226,21 @@ async def etsy_candidate_preview(request):
         return web.json_response({"error": str(error)}, status=400)
 
 
-def stage_preview_path(root_folder, project_id, route, preview_kind="input"):
+def stage_preview_path(root_folder, project_id, route, preview_kind="input", mockup_variant="print"):
     project_id = normalize_identifier(project_id, "Project ID")
+    mockup_variant = str(mockup_variant).strip().lower()
+    if mockup_variant not in {"print", "emb"}:
+        raise ValueError("Mockup output must be print or emb.")
     input_stems = {
         "artwork_foundation": [f"artwork_{project_id}_transparent", f"artwork_{project_id}"],
-        "artwork_stitchwork": [f"base_{project_id}_print"],
-        "artwork_colorway": [f"base_{project_id}_emb"],
+        "artwork_mockup": [f"base_{project_id}_transparent"],
+        "artwork_stitchwork": [f"mockup_{project_id}_print", f"base_{project_id}_print"],
+        "artwork_colorway": [f"mockup_{project_id}_emb", f"base_{project_id}_emb"],
     }
     output_stems = {
         "artwork_foundation": [f"base_{project_id}_transparent"],
-        "artwork_stitchwork": [f"base_{project_id}_emb"],
+        "artwork_mockup": [f"mockup_{project_id}_{mockup_variant}"],
+        "artwork_stitchwork": [f"mockup_{project_id}_emb"],
     }
     if route in {"redesign_emb_candidate", "redesign_print_candidate"}:
         if not project_id.startswith("RD"):
@@ -261,7 +273,11 @@ async def etsy_stage_preview(request):
         project_id = str(request.query.get("project_id", "")).strip()
         route = str(request.query.get("route", "")).strip()
         preview_kind = str(request.query.get("preview_kind", "input")).strip().lower()
-        return web.FileResponse(stage_preview_path(root_folder, project_id, route, preview_kind))
+        mockup_variant = str(request.query.get("mockup_variant", "print")).strip().lower()
+        return web.FileResponse(
+            stage_preview_path(root_folder, project_id, route, preview_kind, mockup_variant),
+            headers={"Cache-Control": "no-store"},
+        )
     except (ValueError, OSError, json.JSONDecodeError) as error:
         return web.json_response({"error": str(error)}, status=404)
 
@@ -410,13 +426,18 @@ def stage_input_path(context):
     if route == "artwork_foundation":
         path = first_matching_asset(project_dir, [f"artwork_{project_id}_transparent", f"artwork_{project_id}"])
         expected = project_dir / f"artwork_{project_id}_transparent.png"
+    elif route == "artwork_mockup":
+        path = first_matching_asset(project_dir, [f"base_{project_id}_transparent"])
+        expected = project_dir / f"base_{project_id}_transparent.png"
     elif route == "artwork_stitchwork":
-        # Accept the historical base name and the established manual mockup name.
-        path = first_matching_asset(project_dir, [f"base_{project_id}_print", f"mockup_{project_id}_print"])
+        # Prefer the AI Mockup Placement asset; accept the historical base name.
+        path = first_matching_asset(project_dir, [f"mockup_{project_id}_print", f"base_{project_id}_print"])
         expected = project_dir / f"mockup_{project_id}_print.png"
     elif route == "artwork_colorway":
-        path = first_matching_asset(project_dir, [f"base_{project_id}_emb"])
-        expected = project_dir / f"base_{project_id}_emb.png"
+        # The current Stitchwork route writes an embroidery mockup. Keep the
+        # historical base name readable for existing projects.
+        path = first_matching_asset(project_dir, [f"mockup_{project_id}_emb", f"base_{project_id}_emb"])
+        expected = project_dir / f"mockup_{project_id}_emb.png"
     elif route in {"redesign_emb_candidate", "redesign_print_candidate"}:
         source_dir = project_dir / "source"
         paths = sorted((path for path in source_dir.iterdir() if path.is_file() and path.suffix.lower() in CANDIDATE_EXTENSIONS), key=filename_sort_key) if source_dir.is_dir() else []
@@ -565,6 +586,8 @@ class EndorphinEtsyProjectSelector:
             "root_folder": root_folder,
             "asset_stage": "project",
         })
+        if route == "artwork_mockup":
+            context["mockup_variant"] = "emb" if str(data.get("mockup_variant", "print")).strip().lower() == "emb" else "print"
         if route == "redesign_colorway":
             letter = normalize_letter(data.get("candidate_letter"))
             project_dir = Path(context["project_path"])
@@ -1106,8 +1129,11 @@ STAGE_SAVE_PRESETS = {
     "Artwork Foundation": {
         "route": "artwork_foundation", "prefix": "base", "suffix": "transparent", "subfolder": "", "candidate": False,
     },
+    "Artwork Mockup": {
+        "route": "artwork_mockup", "prefix": "mockup", "suffix": "print", "subfolder": "", "candidate": False,
+    },
     "Artwork Stitchwork": {
-        "route": "artwork_stitchwork", "prefix": "base", "suffix": "emb", "subfolder": "", "candidate": False,
+        "route": "artwork_stitchwork", "prefix": "mockup", "suffix": "emb", "subfolder": "", "candidate": False,
     },
     "Artwork Colorway": {
         "route": "artwork_colorway", "prefix": "mockup", "suffix": "emb", "subfolder": "emb", "candidate": False,
@@ -1184,6 +1210,11 @@ class EndorphinEtsyStageSave:
         directory = Path(context.get("product_path") or project_dir) / preset["subfolder"]
         directory.mkdir(parents=True, exist_ok=True)
         suffix_value = f"_{preset['suffix']}" if preset["suffix"] else ""
+        if preset["route"] == "artwork_mockup":
+            mockup_variant = str(context.get("mockup_variant", "print")).strip().lower()
+            if mockup_variant not in {"print", "emb"}:
+                raise ValueError("Artwork Mockup output must be print or emb.")
+            suffix_value = f"_{mockup_variant}"
         if preset["route"].endswith("_colorway") and color_code:
             suffix_value += f"_{str(color_code).strip().upper()}"
         stem = stage_filename(preset["prefix"], identifier, suffix_value)
