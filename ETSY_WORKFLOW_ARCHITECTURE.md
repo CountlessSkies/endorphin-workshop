@@ -16,12 +16,14 @@ accepts another absolute project root. Artwork and Redesign are separate:
 │  ├─ base_<ID>_transparent.png
 │  ├─ mockup_<ID>_print.png
 │  ├─ mockup_<ID>_emb.png
-│  └─ emb/mockup_<ID>_emb_<COLOR_CODE>.png
+│  ├─ emb/mockup_<ID>_emb_<COLOR_CODE>.png
+│  └─ print/mockup_<ID>_print_<MODEL>_<COLOR_CODE>.png
 └─ redesign/<RDYYMMNNN>/
    ├─ source/<original reference filename>
    ├─ project.json
    ├─ candidate_<ID>A.png
-   └─ <ID>A/mockup_<ID>A_emb_<COLOR_CODE>.png
+   ├─ <ID>A/mockup_<ID>A_emb_<COLOR_CODE>.png
+   └─ print/mockup_<ID>_print_<MODEL>_<COLOR_CODE>.png
 ```
 
 The filenames above show the usual single image outputs. A stage that saves
@@ -193,15 +195,20 @@ image in a Redesign project's `source/` folder.
 
 The selector filters IDs by year and month, provides ↑/↓ ID navigation, shows
 all 16 Gildan 5000 colors as clickable swatches, and previews both source and
-saved output. It offers MAN,
-WOM, BOY, and GIRL; Small, Standard, and Large artwork sizes; and an occasion.
+saved output. Both loaded previews use the full node width and their images'
+natural aspect ratios, without cropping or a fixed image height. The node
+grows or shrinks when the selected image changes; missing-image placeholders
+keep a fixed height. Output preview can be refreshed after saving. It offers
+MAN, WOM, BOY, and GIRL; Small, Standard, and Large artwork sizes; and an
+occasion.
 Occasion changes scene styling in the compiled prompt, not the artwork. Match
 Artwork derives the background mood from the printed design. One
 queue item generates the selected model and color. Stage Save writes
 `print/mockup_<ID>_print_<MODEL>_<COLOR_CODE>.png` inside that project.
 This does not replace the root-level `mockup_<ID>_print.png` used as a
-Stitchwork input. The bundled Print workflow keeps both Artwork and Redesign
-routes wired, with a blank RH API key for the operator to set locally.
+Stitchwork input or the candidate-based Redesign embroidery outputs. The
+bundled Print workflow keeps both Artwork and Redesign routes wired, with a
+blank RH API key for the operator to set locally.
 
 ## Compatibility
 

@@ -100,10 +100,14 @@ same Stage Save also handles Print context and writes
 ### Endorphin Etsy Print
 The separate Print Selector filters existing Artwork or Redesign IDs by year and
 month, with ↑/↓ buttons to step through IDs, then chooses one model
-(MAN/WOM/BOY/GIRL), one of 16 visible Gildan 5000
-color swatches, a quick Small/Standard/Large print size, and an occasion
+(MAN/WOM/BOY/GIRL), one of 16 visible Gildan 5000 color swatches, a quick
+Small/Standard/Large print size, and an occasion
 (including Match Artwork for a background guided by the print design). It
-previews the source and saved output for the selected model and color. Artwork uses
+previews the source and saved output for the selected model and color. Both
+image previews fill the node width and adjust their height to the image's
+aspect ratio without cropping; the node resizes when the image changes. Empty
+previews retain a fixed-height placeholder, and the saved output has a refresh
+button. Artwork uses
 `artwork_<ID>` first and falls back to `artwork_<ID>_transparent`; Redesign
 uses the first image in `source/`. The Print Prompt Compiler builds the RH
 image prompt. Print Branch Gates and the lazy Print Router select the active
