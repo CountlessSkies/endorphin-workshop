@@ -1,568 +1,192 @@
 # Endorphin Etsy Workflow Architecture
 
-This document is the handoff specification for the next Etsy workflow redesign.
-It records the agreed asset structure, naming rules, and the intended behavior of
-the supporting Endorphin nodes.
+Status: current behavior and agreed direction as of 2026-09-25. This document
+describes the project context workflow in Endorphin Workshop. The legacy Etsy
+Listing nodes remain available for older ComfyUI workflows.
 
-## Goals
+## Project identity and folders
 
-- Keep the **idea/artwork** and **redesign** businesses independent while using a
-  consistent delivery structure.
-- Separate digital-print assets from embroidery assets.
-- Batch colorways without manually typing IDs, paths, or filenames repeatedly.
-- Use **Endorphin Etsy Color Palette** as the colorway source of truth. The
-  older general palette picker remains available only for legacy workflows.
-- Prevent colorway from running against an unapproved redesign candidate.
-
-## Root layout
+The default root is `G:\My Drive\_Etsy\_Listing`. The Project Selector also
+accepts another absolute project root. Artwork and Redesign are separate:
 
 ```text
-G:\My Drive\_Etsy\_Listing\
-├─ artwork\
-│  └─ <ARTWORK_ID>\
-└─ redesign\
-   └─ <REDESIGN_BATCH_ID>\
+<root>/
+├─ artwork/<YYMMNNN>/
+│  ├─ artwork_<ID>_transparent.png
+│  ├─ base_<ID>_transparent.png
+│  ├─ mockup_<ID>_print.png
+│  ├─ mockup_<ID>_emb.png
+│  └─ emb/mockup_<ID>_emb_<COLOR_CODE>.png
+└─ redesign/<RDYYMMNNN>/
+   ├─ source/<original reference filename>
+   ├─ project.json
+   ├─ candidate_<ID>A.png
+   └─ <ID>A/mockup_<ID>A_emb_<COLOR_CODE>.png
 ```
 
-`legacy\` may be retained beside these folders for old listings. It is not part
-of the new workflows.
+The filenames above show the usual single image outputs. A stage that saves
+multiple images in one execution adds `_01`, `_02`, and so on before `.png`.
+Artwork may also have `artwork_<ID>.png` as its source. The Redesign `source/`
+folder keeps supplier filenames unchanged.
 
-## Identifiers
+Artwork IDs use `YYMMNNN`; Redesign batch IDs use `RDYYMMNNN`. A Redesign
+candidate letter is part of its permanent product ID after approval:
+`candidate_RD2608001B.png` belongs to `RD2608001B`. Approval never renumbers
+candidate letters.
 
-### Artwork IDs
+The Project Selector's Year and Month choose a `YYMM` period. The existing ID
+dropdown shows only folders with that period and the selected workflow prefix.
+Changing the period clears the current ID. `+ New` uses the same period and
+creates the lowest unused ID. Refresh rescans the folder list.
 
-Artwork IDs are assigned by the person supplying the idea and remain independent
-from redesign IDs. Example: `2608001`.
+## Artwork stages
 
-The canonical source artwork is named `artwork_<ARTWORK_ID>`.
+| Route | Input resolved from disk | Stage Save output |
+| --- | --- | --- |
+| `artwork_foundation` | `artwork_<ID>_transparent`, falling back to `artwork_<ID>` | `base_<ID>_transparent.png` |
+| `artwork_mockup` with **Print** | `base_<ID>_transparent` | `mockup_<ID>_print.png` |
+| `artwork_mockup` with **Embroidery** | `base_<ID>_transparent` | `mockup_<ID>_emb.png` |
+| `artwork_stitchwork` | `mockup_<ID>_print`, falling back to old `base_<ID>_print` | `mockup_<ID>_emb.png` |
+| `artwork_colorway` | `mockup_<ID>_emb`, falling back to old `base_<ID>_emb` | `emb/mockup_<ID>_emb_<COLOR_CODE>.png` |
 
-The Project Selector scans direct project folders into an ID picker filtered by
-its selected `YYMM` year/month period; `Refresh` rescans that filtered list and
-removes a selected ID when it no longer matches. Its `+ New` action uses the
-same compact `Year` and `Month` dropdowns (placed before the ID picker), joins
-them as `YYMM`, then creates the lowest unused `YYMMNNN` folder ID. This does
-not replace the idea owner's authority to
-choose the artwork ID. When an externally assigned ID is needed, create that
-correctly named folder outside ComfyUI and press `Refresh`.
+Foundation produces the transparent base. Mockup is an AI placement route: it
+places that base on a garment mockup and offers Print or Embroidery output.
+Stitchwork converts a saved print mockup to an embroidery mockup. Colorway starts
+from the embroidery mockup. Missing input files produce an error naming the
+expected asset.
 
-### Redesign IDs
+Mockup–Embroidery and Stitchwork both write `mockup_<ID>_emb.png`. Today Stage
+Save replaces an existing file at that path. Their preview shows whichever
+version is currently on disk; the filename does not record which route made it.
+Choose the intended producer in the workflow before running either stage.
 
-Each redesign reference batch receives an internally assigned ID:
+The selector previews each route's required input and, where available, its
+saved output. Mockup's output preview follows the Print/Embroidery choice.
+Preview responses bypass browser cache so a replaced file is shown promptly.
+
+## Redesign stages and approval
+
+| Route | Input | Stage Save output |
+| --- | --- | --- |
+| `redesign_emb_candidate` | First filename sorted image in `source/` | `candidate_<ID><LETTER>.png` |
+| `redesign_print_candidate` | First filename sorted image in `source/` | `candidate_<ID><LETTER>.png` |
+| `redesign_colorway` | Selected approved candidate image on disk | `<ID><LETTER>/mockup_<ID><LETTER>_emb_<COLOR_CODE>.png` |
+
+Print and embroidery references are two candidate generation routes, not two
+sequential stages. Print reference simplification belongs in its AI branch.
+The source directory accepts the supported image formats, including AVIF.
+Sorting compares filenames without their extensions first, so a base filename
+precedes a suffixed variant.
+
+Candidate Save allocates the first unoccupied, unapproved letter, starting with
+`A`. It reserves the letter while saving; an IMAGE batch allocates one letter
+per image. An unapproved candidate can be deleted and its letter reused.
+Approval records the letter in `project.json`; its product ID remains fixed.
+Colorway requires an explicitly selected, approved candidate that still exists
+on disk. Deleting a candidate through the selector also deletes that
+candidate's product folder and its colorways after confirmation.
+
+`project.json` stores the Redesign project ID, source type, approved letters,
+and schema version. Actual images on disk remain the source of asset existence.
+
+## Fixed garment color catalogue
+
+The Project Selector palette, standalone Etsy Color Palette, and general Color
+Palette Picker use the same 17 rows in this order:
+
+| Index | Color | Code | Index | Color | Code |
+| ---: | --- | --- | ---: | --- | --- |
+| 1 | Military Green | MGR | 10 | Orange | ORG |
+| 2 | Carolina Blue | CBL | 11 | Light Blue | LBL |
+| 3 | Navy | NVY | 12 | Forest Green | FGR |
+| 4 | Black | BLK | 13 | Beige | BEI |
+| 5 | Sand | SND | 14 | Maroon | MRN |
+| 6 | Grey | GRY | 15 | Light Pink | LPK |
+| 7 | White | WHT | 16 | Brown | BRN |
+| 8 | Sport Grey | SGR | 17 | Chocolate | CHC |
+| 9 | Ash | ASH |  |  |  |
+
+Names, order, integer values, and three letter codes are fixed. HEX swatches
+can be edited directly or with HSL controls; the bundled HEX values are
+starting approximations, not verified supplier specifications. A HEX edit does
+not change a color's name or code. Clicking a swatch selects its row without
+resizing the node. The general Palette Picker also supports a connected
+`index_value` that overrides the UI selection at execution time, plus optional
+auto increment and loop.
+
+The selected color's name, HEX, and code are included in Etsy context on
+Colorway routes. The default prompt text is `<Color Name> (hex #RRGGBB)`.
+Stage Save uses the code from context for the output filename; garment type and
+size are outside this image pipeline. The full selling SKU is assembled
+downstream.
+
+Old garment color suffixes were renamed in the listing asset tree:
+
+| Old | New | Old | New | Old | New |
+| --- | --- | --- | --- | --- | --- |
+| BLC | BLK | BRW | BRN | TML | BEI |
+| DBL | CBL | CHR | GRY | HGR | SGR |
+| CRM | MRN | SAG | MGR | FRS | FGR |
+| BLS | LPK | SBL | LBL |  |  |
+
+The 2026-09 migration renamed 172 matching files under the default listing
+root. This was a one time filesystem rename; the nodes do not translate old
+suffixes dynamically. Existing `SND`, `NVY`, `WHT`, and `CHC` filenames
+already matched the new catalogue.
+
+## Routing and execution
+
+`ENDORPHIN_ETSY_CONTEXT` carries project root, workflow type, project ID,
+selected route, and route specific metadata such as candidate/product ID,
+color code, and Mockup Print/Embroidery choice. Image tensors travel through
+IMAGE links. The Project Selector emits context and the selected stage's disk
+input image.
+
+The Stage Router has one optional lazy IMAGE input per route. It requests only
+the selected input from context and forwards that image and context to Stage
+Save. Connect the selected stage's generated image to its matching router
+input. A missing active connection raises an error; inactive route inputs may
+remain unconnected.
+
+Some third party generators are themselves ComfyUI output nodes and may run
+even if the lazy router never requests their branch. Put a Stage Branch Gate
+before each such generator, with `stage_route` set to that branch. Inactive
+gates return an execution blocker. Stage Save reads the route and color from
+context, so no separate stage or color code input is needed.
 
 ```text
-RD2608001
+Project Selector context ──────────────┬──────────────> Stage Router context
+                                       └──────────────> Stage Save context
+Project Selector stage_input_image ──> active AI branch
+active AI branch image ────────────────> matching lazy router input
+Stage Router image ────────────────────> Stage Save images
 ```
 
-There are no hyphens. This batch ID represents the source/reference lineage; it
-is not itself a sellable candidate/SKU.
-
-Candidate letters are exploration slots before approval. When a candidate is
-approved, its letter becomes the permanent suffix of the sellable design ID:
-
-```text
-RD2608001A
-RD2608001B
-RD2608001C
-```
-
-The slot-to-product mapping is fixed; approval never renames or reorders it:
-
-```text
-candidate slot A (v01) = RD2608001A
-candidate slot B (v02) = RD2608001B
-candidate slot C (v03) = RD2608001C
-candidate slot D (v04) = RD2608001D
-```
-
-If only candidate 2 is approved, it remains `RD2608001B`. Before approval, a
-deleted candidate releases its slot for a new exploration candidate. After
-approval, that letter is permanently bound to its product identity and can never
-be reused for a different design.
-
-## Workflow A — Idea / Artwork
-
-Project Selector routes are `artwork_foundation`, `artwork_mockup`,
-`artwork_stitchwork`, and `artwork_colorway`; only the selected route is
-intended to be evaluated.
-
-### Artwork stages
-
-```text
-Foundation: artwork_<ID>_transparent -> base_<ID>_transparent
-Mockup:     base_<ID>_transparent -> mockup_<ID>_print | mockup_<ID>_emb
-Stitchwork: mockup_<ID>_print -> mockup_<ID>_emb
-Colorway:   mockup_<ID>_emb -> colored mockup outputs
-```
-
-`mockup_<ID>_print` is generated by the AI Mockup Placement route. Selecting
-Stitchwork before that file exists must fail with the expected path and must
-not invoke an image-generation node.
-
-Artwork may be generated directly with transparency; an opaque original is
-optional rather than required. The resulting artwork produces three deliberately
-separate branches.
-
-```mermaid
-flowchart TD
-    A[artwork_ID_transparent] --> C[Digital download asset]
-
-    A --> D[Embroidery preparation]
-    D --> E[base_ID_flat: digitize-friendly simplified design]
-    E --> F[Manual mockup_ID_print]
-    F --> G{Print mockup exists?}
-    G -->|yes| H[Convert print mockup to embroidery]
-    H --> I[Embroidery colorway]
-    I --> J[emb output files]
-
-    A --> K[Manual / free print mockup generation]
-    K --> L[Optional print colorway]
-    L --> M[print output files]
-```
-
-Important rules:
-
-1. `artwork_<ID>_transparent` is the canonical artwork asset and the
-   digital-download product asset.
-2. The AI Mockup Placement route can save either `mockup_<ID>_print` or
-   `mockup_<ID>_emb`. The print variant is the explicit gate before any
-   artwork-to-embroidery conversion runs.
-3. The AI mockup branch starts from Foundation's transparent base asset and
-   does not have to use the embroidery process.
-4. The embroidery branch is controlled: use the saved print mockup, convert it
-   to an embroidery mockup, then colorway.
-5. `print` and `emb` are separate output folders. Do not make one color folder
-   per color; color variants live directly in each output folder.
-
-### Artwork folder example
-
-```text
-artwork\
-└─ 2608001\
-   ├─ artwork_2608001.png
-   ├─ artwork_2608001_transparent.png
-   ├─ base_2608001_flat.png
-   ├─ mockup_2608001_print.png              # AI Mockup Placement output
-   ├─ print\
-   │  ├─ mockup_2608001_C01_mocha-taupe_print.png
-   │  └─ mockup_2608001_C02_soft-white_print.png
-   └─ emb\
-      ├─ mockup_2608001_C01_mocha-taupe_emb.png
-      └─ mockup_2608001_C02_soft-white_emb.png
-```
-
-`mockup_<ID>_neutral` is an embroidery working asset, not a required input to
-the print branch.
-
-## Workflow B — Redesign for embroidery
-
-Project Selector routes are `redesign_emb_candidate`,
-`redesign_print_candidate`, and `redesign_colorway`. Print candidate generation
-includes simplification in its candidate prompt; it has no separate simplify
-stage.
-
-## Target minimal node architecture
-
-The intended end state is **two public Etsy nodes**, not a chain of selector,
-stage, source-loader, candidate-loader, and palette nodes.
-
-### 1. Endorphin Etsy Project Selector
-
-This is the project control panel. It owns project-folder selection and the
-currently selected route. It exposes a common `context` metadata output for
-file operations plus one selected route token; route outputs are available for
-open, user-wired branches:
-
-```text
-artwork_foundation
-artwork_mockup
-artwork_stitchwork
-artwork_colorway
-redesign_emb_candidate
-redesign_print_candidate
-redesign_colorway
-```
-
-The UI progressively reveals only valid choices. Artwork shows its four
-stages. Redesign shows Candidate or Colorway; Candidate then chooses Embroidery
-Reference or Print Reference. The two redesign source types are independent
-routes, not ordered stages. Print Reference performs simplification inside its
-candidate-generation prompt; it does not persist a separate simplify asset.
-
-For `redesign_colorway`, the Selector also owns candidate selection: it lists
-available candidates, previews the selected candidate, and can approve it.
-The resulting context carries `product_id` and the selected candidate path.
-
-The Etsy Color Palette is integrated into this Selector and shown only on
-Colorway routes. The selected row contributes `color_name`, `color_hex`, and
-`color_code` to context. For queue batching, a separate `color_index` control
-(for example the existing Auto Reset Int) determines which palette row is used
-for a given queue item; the palette editor remains the durable editable source
-of all color data.
-
-### 2. Endorphin Etsy Stage Save
-
-One output node receives `images` and `context`. Prefix and suffix use fixed
-dropdown conventions rather than arbitrary text:
-
-```text
-prefix: artwork / base / mockup / candidate
-suffix: none / transparent / print / emb
-```
-
-Colorway uses `color_code` from context when constructing its filename. Choosing
-the `candidate` convention for a Redesign context uses the alphabetical
-allocator: it scans persisted candidates, fills missing unapproved letters
-first, and never reuses an approved letter.
-
-## Routing requirement
-
-Selector route outputs alone do not stop ComfyUI evaluation. Each eventual
-branch merge/save must use lazy inputs keyed by the selected route, so ComfyUI
-requests only the active Artwork/Redesign route and only its selected stage.
-
-Redesign creates only embroidery outputs. It intentionally has no print branch.
-
-```mermaid
-flowchart TD
-    A[Embroidery reference] --> C[Redesign batch: candidate v01-v04]
-    B[Print reference] --> D[Simplify to base_RD..._flat]
-    D --> C
-    C --> E[Explicitly approve one or more candidates]
-    E --> F[Fixed product IDs: RD...A / RD...B / ...]
-    F --> G[Neutral mockup]
-    G --> H[Embroidery simulation]
-    H --> I[Embroidery colorway]
-    I --> J[emb output files]
-```
-
-### Reference modes
-
-| Source type | Rule |
-| --- | --- |
-| `embroidery_reference` | A shirt/design already suitable for embroidery. It may go directly into the redesign batch. |
-| `print_reference` | A printed shirt or print-oriented graphic. It first goes through an explicit simplification step that outputs `base_<RD_BATCH_ID>_flat`; only then can it enter the embroidery redesign batch. |
-
-Do not make `print_reference` an invisible alternate mode of the normal redesign
-workflow. Keeping its preparation stage explicit prevents print-only texture,
-gradients, and fine detail from contaminating the stable embroidery workflow.
-
-### Raw references have no naming convention
-
-Reference images may arrive with arbitrary names. Do not rename them manually or
-require the sender to follow an Endorphin convention. The project folder provides
-the identity; derived assets start using the `RD...` naming convention.
-
-```text
-redesign\
-└─ RD2608001\
-   ├─ source\
-   │  └─ supplier-image-final (3).jpg       # arbitrary original filename
-   ├─ base_RD2608001_flat.png                # only for print_reference
-   ├─ candidate_RD2608001A.png
-   ├─ candidate_RD2608001B.png
-   ├─ candidate_RD2608001C.png
-   ├─ candidate_RD2608001D.png
-   ├─ RD2608001A\
-   │  ├─ mockup_RD2608001A_MTP.png
-   │  └─ mockup_RD2608001A_SWH.png
-   └─ RD2608001B\
-      └─ mockup_RD2608001B_MTP.png
-```
-
-## Candidate approval rule
-
-Colorway must never select a candidate implicitly or use an unapproved
-candidate. The candidate index already determines its product ID; approval only
-records which existing candidates may proceed:
-
-```text
-candidate slot A -> RD2608001A
-candidate slot B -> RD2608001B
-candidate slot C -> RD2608001C
-candidate slot D -> RD2608001D
-```
-
-The candidate file is also that candidate's neutral/master asset. Approval
-does not duplicate it as a separate `mockup_..._neutral` file; it only grants
-the fixed product ID permission to enter Colorway.
-
-The operator can approve multiple candidates, for example `B` and `D`. Only
-approved IDs appear in the downstream colorway picker/loader. If none has been
-approved, the workflow should show a clear validation error rather than silently
-processing candidate 1.
-
-### Candidate slot lifecycle
-
-```text
-unapproved slot  -> reusable exploration slot
-approved slot    -> permanently locked product identity
-```
-
-Operational rules:
-
-1. An existing candidate asset is never silently overwritten.
-2. A deliberately deleted, unapproved slot may be filled by a newly generated
-   candidate.
-3. Candidate generation fills reusable unapproved gaps first, then uses the next
-   available letter (`E`, `F`, ...) when no gap is available.
-4. Missing unapproved candidates are valid. A missing approved candidate or its
-   required approved/master asset is a validation error.
-5. Approval resolves the candidate currently persisted on disk. It must not
-   approve an old IMAGE reference still held by the graph/UI.
-6. Approval does not mean every downstream asset already exists. Each downstream
-   stage validates the specific asset it requires and must not release a locked
-   letter when that asset is missing.
-
-### Alphabetical candidate auto-increment
-
-`Endorphin Etsy Candidate Save` behaves like an auto-increment node, but its counter
-is alphabetical rather than numeric:
-
-```text
-A -> B -> C -> D -> E -> F -> ...
-```
-
-It must allocate a slot when each generated image is saved, not assume a fixed
-batch count. Therefore a ComfyUI batch/queue of two saves `A`, then `B`; a batch
-of four saves `A` through `D`; a later queue resumes at the next available slot.
-If one execution returns an IMAGE batch, allocation follows the image order
-within that batch.
-
-For every image, the node performs this allocation:
-
-```text
-1. Read project.json to find approved/locked letters.
-2. Scan the redesign project folder for existing candidate files.
-3. Starting at A, choose the first letter that is neither locked nor occupied.
-4. Save the image and expose its letter, product_id, and path as outputs.
-```
-
-This makes the node state-aware rather than a volatile UI counter. For example,
-an unapproved `C` whose candidate file was deleted becomes available again;
-approved `A` remains permanently skipped. Candidate files use the unambiguous
-form:
-
-```text
-candidate_RD2608001A.png
-candidate_RD2608001B.png
-```
-
-The allocator should reserve a selected slot before writing its file so that two
-near-simultaneous saves cannot choose the same letter.
-
-### Candidate file and preview operations
-
-The candidate filename is deliberately neutral; it does not include `_emb`:
-
-```text
-candidate_RD2608001A.png
-```
-
-Both Embroidery Reference and Print Reference create this same embroidery
-candidate format. Their source distinction remains in `project.json`, not in
-the candidate filename. Project Selector previews the route input before a run,
-then previews generated candidates. A rebuilt candidate must receive a new
-preview revision so the browser never reuses the thumbnail of a deleted file.
-
-Candidate deletion is a project operation: deleting letter `A` deletes its
-candidate file, its `RD...A/` product folder and every colorway inside it, and
-removes `A` from `approved_candidates`. It requires an explicit confirmation.
-
-Source discovery accepts PNG, JPG/JPEG, WEBP, AVIF, BMP, TIFF, and GIF (first
-frame), allowing supplied marketplace references such as AVIF files.
-
-### Project manifest
-
-The filesystem remains the source of the actual assets. Each project also keeps
-a small `project.json` manifest for state that cannot safely be inferred from a
-filename, especially source type and approval state. Nodes create and update it;
-the operator should not normally need to edit it by hand.
-
-```json
-{
-  "schema_version": 1,
-  "project_id": "RD2608001",
-  "source_type": "print_reference",
-  "approved_candidates": ["B", "D"]
-}
-```
-
-This lets the Colorway Loader safely discover `RD2608001B` and `RD2608001D`
-after the workflow has been closed and reopened.
-
-## Colorway convention
-
-**Endorphin Etsy Color Palette** is the fixed 17-colour apparel catalogue.
-Names, ordering, values, and colour codes are locked; only the HEX swatch may
-be adjusted for an exact supplier variant.
-
-Recommended output fields for each colorway are:
-
-```text
-colorway_index   C01, C02, ...
-color_name        mocha taupe
-color_slug        mocha-taupe
-color_hex         #977D67
-color_code        MTP
-prompt_color      optional exact prompt text/override
-```
-
-`prompt_color` resolves to the generated default (for example `mocha taupe (hex
-#977D67)`) unless that particular palette row has an explicit prompt override.
-That removes the need to duplicate the color list in **Endorphin Text Lines** and
-**Endorphin Switch Case**, while retaining the ability to use different text in
-the generation prompt when needed.
-
-### Color code and SKU handoff
-
-`color_code` is a required, stable three-letter uppercase code stored directly
-in the fixed Etsy Color Palette row. It is an image-pipeline SKU component;
-the palette order and `colorway_index` are fixed as well.
-
-```text
-mocha taupe  | #977D67 | MTP
-soft white   | #D9DADE | SWH
-black navy   | #272A37 | BNV
-```
-
-The fixed catalogue supplies each colour code directly; no automatic suggestion
-or operator code edit is used.
-
-Rules:
-
-1. A code is exactly three uppercase letters (`A-Z`).
-2. It must be unique inside the active palette.
-3. Renaming a color, changing its hex value, or reordering rows must not
-   automatically change an existing code.
-4. A duplicate or invalid code should be shown as a validation error for the
-   operator to resolve; it must not silently generate a different SKU code.
-
-Color field semantics are deliberately separate:
-
-```text
-color_name      human-readable color intent
-color_code      stable machine identity
-color_hex       editable generation/tuning parameter
-colorway_index  current palette/batch order only
-```
-
-Changing a hex value to improve a generation must not change `color_name` or
-`color_code`. Two rows may intentionally share a name or hex value; only their
-`color_code` values must be unique within the active palette.
-
-The image workflow outputs only the two stable SKU components it owns. Garment
-type, garment color, size, and all final-SKU assembly belong to the separate
-selling system:
-
-```text
-product_id: RD2608001B
-color_code: MTP
-```
-
-Suggested image filename:
-
-```text
-mockup_RD2608001B_C01_MTP_mocha-taupe_emb.png
-```
-
-`C01` is retained for batch readability; `MTP` is the stable color component of
-the image-production identity. The downstream selling system receives
-`product_id` and `color_code`, then combines them with garment, size, and its
-other required fields to form the final SKU.
-
-The following is an implementation invariant:
-
-```text
-product_id + color_code = one unique image-production color variant
-```
-
-For example, `RD2608001B + MTP` always identifies the mocha-taupe asset variant
-for product `RD2608001B`. `colorway_index` is not part of this identity. Asset
-savers should use this key for overwrite detection, duplicate detection, asset
-lookup, and safely resuming a colorway batch.
-
-An output filename's color slug is a descriptive snapshot at generation time,
-not identity. Renaming a palette color affects newly generated filenames only;
-it must not rename old output files.
-
-When an asset already exists for the same `product_id + color_code`, the Save
-node should offer an explicit `on_existing` behavior:
-
-```text
-Replace existing
-Fail if exists
-Skip if exists
-```
-
-The identity remains the same in all three cases. The choice is operational:
-`Replace` is useful after tuning a prompt or hex value, while `Fail`/`Skip` are
-useful for a conservative batch run.
-
-Switch Case remains useful for non-color conditional logic; it should not be the
-second source of truth for palette names or hex values.
-
-## Intended Endorphin node roles
-
-These are design targets for the next node/workflow pass, not all necessarily
-implemented yet.
-
-| Node / capability | Responsibility |
-| --- | --- |
-| Etsy Project Selector | One fixed clickable card UI: choose Artwork or Redesign, filter existing IDs by Year and Month, then select an ID from that period. The same date drives `+ New`. Artwork includes Foundation, AI Mockup Placement, Stitchwork, and Colorway; Redesign shows the applicable reference routes. It creates canonical context. |
-| Etsy Workflow Stage | Select `Prepare`, `Approve`, or `Colorway` and enable only the corresponding output branch. |
-| Etsy Lazy Workflow Router | Accept lazy Artwork and Redesign image inputs, requesting only the branch chosen in context so the other branch is not evaluated. |
-| Etsy Source Asset Loader | Resolve and load the source automatically: `artwork_<ID>` for artwork projects, or the first source file in `redesign/<RD_ID>/source/` for redesign projects. |
-| Etsy Asset Loader | Load a stage asset such as artwork, base, neutral mockup, or an approved candidate. |
-| Etsy Candidate Save | Save generated redesign candidates with state-aware alphabetical auto-increment (`A`, `B`, `C`...), never overwriting an occupied or approved slot. |
-| Etsy Approve Redesign Candidate | Mark one or more fixed candidates `A/B/C...` as approved in `project.json`. It must require an explicit selection and never renumber candidates. |
-| Etsy Batch Loader | Iterate approved projects/candidates for a chosen stage; do not use it to iterate all variants in one `print` or `emb` folder. |
-| Etsy Asset Save | Receive context plus palette fields and generate the correct folder/filename automatically. |
-| Etsy Color Palette | Fixed 17-colour catalogue with stable three-letter codes; HEX remains editable. |
-| Folder Image Loader | Iterate multiple images already inside one `print` or `emb` folder. |
-| Subfolder Image Loader | Iterate one selected matching image per project/leaf folder; useful for project-level batch discovery, not multiple color files in the same folder. |
-
-`ENDORPHIN_ETSY_CONTEXT` is the versioned canonical metadata contract between
-Etsy-aware nodes. It carries workflow type, project ID, selected
-candidate/product ID, source type, asset stage, project root, and resolved paths
-between these nodes. It should not carry transient image payloads or the whole
-palette: images remain `IMAGE` links and the Etsy Color Palette remains the colorway
-source of truth. Context avoids retyping paths and protects against mixing
-artwork and redesign IDs.
-
-All Etsy-aware nodes use shared normalization and validation rules: identifiers
-and color codes compare case-insensitively, while canonical manifest storage and
-generated output use uppercase (`rd2608001b` -> `RD2608001B`, `mTp` -> `MTP`).
-No node may infer a project ID or product ID from an arbitrary user-supplied
-source filename; identity comes from the Project Picker, project folder, and
-context/manifest only.
-
-## One workflow, separate execution stages
-
-The canvas may contain all routes, but colorway must not run while the
-operator is still preparing or reviewing a design:
-
-```text
-Prepare  -> creates source/base/candidates and saves working assets
-Approve  -> records approved candidate letters in project.json
-Colorway -> loads only approved assets from disk and produces variants
-```
-
-The Colorway branch must load its approved master asset from disk, rather than
-being wired directly to the candidate-generation output. This is the execution
-and approval boundary.
-
-Each branch ends in an Endorphin conditional output/save node whose image input
-is lazy. With `run_stage = Prepare`, for example, the inactive Colorway save node
-does not request its image input; ComfyUI therefore does not traverse upstream
-to RH or any other image-generation node in that branch. This keeps all stages
-in one workflow without manually disabling the inactive image-generation branch.
-
-## Migration and compatibility
-
-- Keep the existing old redesign workflow functional while new nodes are added.
-- New IDs must accept strings, not only numeric `listing_number` values, because
-  `RD2608001A` is a valid product ID.
-- Existing generic loaders remain useful; do not force the new Etsy process to
-  use Subfolder Image Loader when the older workflow already has better-fitting
-  Etsy listing nodes.
-- Build the new project/context/picker nodes before replacing existing nodes.
+## Next development directions
+
+These items describe directions discussed for this workflow. They are not
+implemented unless explicitly marked above.
+
+1. Make concurrent ownership of `mockup_<ID>_emb.png` explicit. Mockup with
+   Embroidery selected and Stitchwork currently share that path. A future
+   overwrite policy or provenance marker should prevent accidental replacement
+   while keeping the agreed filename.
+2. Add an existing asset policy to Stage Save where useful: replace, fail, or
+   skip. Current noncandidate saves replace matching paths; candidate saves
+   allocate a free letter instead.
+3. Keep the Project Selector as the source of project, route, approval, and
+   color decisions. New Etsy nodes should consume context and resolve assets
+   from disk rather than copying IDs, color lists, or paths into more widgets.
+4. Preserve lazy routing as new AI stages are added. Check third party output
+   nodes with a Stage Branch Gate so selecting one route never runs unrelated
+   generation branches.
+5. Keep preview lookup tied to the selected route and saved asset name. When a
+   stage replaces an image, its preview should reflect the current disk file.
+
+## Compatibility
+
+Legacy Etsy Listing nodes and generic folder loaders remain available for old
+workflows. Artwork input resolution accepts historical `base_<ID>_print` and
+`base_<ID>_emb` assets where noted above. Existing workflows that store a
+shorter custom palette are normalized to the fixed 17 row catalogue when
+loaded; HEX values from a full 17 row palette are retained.

@@ -53,11 +53,11 @@ paths stay consistent. The architecture and naming conventions are documented
 in [ETSY_WORKFLOW_ARCHITECTURE.md](ETSY_WORKFLOW_ARCHITECTURE.md).
 
 ### Endorphin Etsy Project Selector
-Choose **Artwork** or **Redesign**, then one route: Artwork Foundation, Mockup
-Placement, Stitchwork, Colorway; or Redesign Embroidery Candidate, Print Candidate,
-Colorway. The node emits a common `context` plus one matching route token.
-**Refresh** scans all direct project folders for the selected workflow and
-removes an ID from the picker when its folder no longer exists.
+Choose **Artwork** or **Redesign**, then one route: Artwork Foundation, Mockup,
+Stitchwork, Colorway; or Redesign Embroidery Candidate, Print Candidate,
+Colorway. The node outputs `context`, the selected stage's input image, and
+the selected color fields. Mockup can save Print or Embroidery. **Refresh**
+rescans IDs for the selected workflow and year/month.
 
 The **Year** and **Month** dropdowns filter the existing-ID picker to their
 matching `YYMM` period and also drive **+ New**. That button creates the lowest
@@ -70,10 +70,11 @@ Loads the canonical source selected by project context: `artwork_<ID>` directly
 inside an Artwork project, or the first filename-sorted file in a Redesign
 project's `source` folder.
 
-### Endorphin Etsy Workflow Stage and Lazy Workflow Router
-Use **Workflow Stage** to express Prepare, Approve, or Colorway flow. The Lazy
-Workflow Router requests only the image input for the selected Artwork or
-Redesign context, preventing the inactive branch from running.
+### Endorphin Etsy Stage Router and Stage Branch Gate
+Connect each AI stage's result to its matching lazy Stage Router input. The
+router requests only the route selected in `context`. When a third-party
+generator is itself a ComfyUI output node, put a Stage Branch Gate before it
+to block its inactive branch.
 
 ### Endorphin Etsy Candidate Save / Approve / Approved Candidate Loader
 Candidate Save writes redesign batches as `A`, `B`, `C`… slots without
