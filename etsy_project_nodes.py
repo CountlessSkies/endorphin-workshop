@@ -1147,6 +1147,12 @@ STAGE_SAVE_PRESETS = {
     "Redesign Colorway": {
         "route": "redesign_colorway", "prefix": "mockup", "suffix": "emb", "subfolder": "", "candidate": False,
     },
+    "Artwork Print": {
+        "route": "artwork_print", "prefix": "mockup", "suffix": "print", "subfolder": "print", "candidate": False,
+    },
+    "Redesign Print": {
+        "route": "redesign_print", "prefix": "mockup", "suffix": "print", "subfolder": "print", "candidate": False,
+    },
 }
 
 
@@ -1191,6 +1197,8 @@ class EndorphinEtsyStageSave:
         except (TypeError, ValueError):
             png_compress_level = 4
         project_dir = Path(context["project_path"])
+        if preset["route"] in {"artwork_print", "redesign_print"} and not project_dir.is_dir():
+            raise ValueError(f"Etsy project folder was not found: {project_dir}")
         if preset["candidate"]:
             if context["workflow_type"] != "redesign":
                 raise ValueError("Candidate naming is available only for Redesign projects.")
@@ -1215,6 +1223,15 @@ class EndorphinEtsyStageSave:
             if mockup_variant not in {"print", "emb"}:
                 raise ValueError("Artwork Mockup output must be print or emb.")
             suffix_value = f"_{mockup_variant}"
+        if preset["route"] in {"artwork_print", "redesign_print"}:
+            if context["workflow_type"] != preset["route"].split("_", 1)[0]:
+                raise ValueError("Print route does not match the project workflow type.")
+            model_code = str(context.get("model_code", "")).strip().upper()
+            if model_code not in {"MAN", "WOM", "BOY", "GIRL"}:
+                raise ValueError("Print output needs a valid model code.")
+            if not re.fullmatch(r"[A-Z]{3}", color_code):
+                raise ValueError("Print output needs a three-letter color code.")
+            suffix_value = f"_print_{model_code}_{color_code}"
         if preset["route"].endswith("_colorway") and color_code:
             suffix_value += f"_{str(color_code).strip().upper()}"
         stem = stage_filename(preset["prefix"], identifier, suffix_value)

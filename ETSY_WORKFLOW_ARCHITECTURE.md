@@ -183,6 +183,26 @@ implemented unless explicitly marked above.
 5. Keep preview lookup tied to the selected route and saved asset name. When a
    stage replaces an image, its preview should reflect the current disk file.
 
+## Separate print apparel workflow
+
+Printed apparel uses its own Selector, Prompt Compiler, lazy Router, and Branch
+Gate. The shared Etsy Stage Save also accepts Print routes and writes their
+filenames. The Print Selector uses
+`artwork_<ID>` before `artwork_<ID>_transparent`, or the first filename-sorted
+image in a Redesign project's `source/` folder.
+
+The selector filters IDs by year and month, provides ↑/↓ ID navigation, shows
+all 16 Gildan 5000 colors as clickable swatches, and previews both source and
+saved output. It offers MAN,
+WOM, BOY, and GIRL; Small, Standard, and Large artwork sizes; and an occasion.
+Occasion changes scene styling in the compiled prompt, not the artwork. Match
+Artwork derives the background mood from the printed design. One
+queue item generates the selected model and color. Stage Save writes
+`print/mockup_<ID>_print_<MODEL>_<COLOR_CODE>.png` inside that project.
+This does not replace the root-level `mockup_<ID>_print.png` used as a
+Stitchwork input. The bundled Print workflow keeps both Artwork and Redesign
+routes wired, with a blank RH API key for the operator to set locally.
+
 ## Compatibility
 
 Legacy Etsy Listing nodes and generic folder loaders remain available for old

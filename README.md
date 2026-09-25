@@ -93,7 +93,24 @@ One convention-aware PNG save node for all Etsy stages. It resolves the fixed
 prefix/suffix convention from the selected route in `context`. Both Redesign
 Candidate stages allocate `candidate_<ID>A`, `candidate_<ID>B`… slots, filling
 missing unapproved letters first and never overwriting approved candidates.
-Colorway stages use `color_code` from the context when creating filenames.
+Colorway stages use `color_code` from the context when creating filenames. The
+same Stage Save also handles Print context and writes
+`print/mockup_<ID>_print_<MODEL>_<COLOR_CODE>.png`.
+
+### Endorphin Etsy Print
+The separate Print Selector filters existing Artwork or Redesign IDs by year and
+month, with ↑/↓ buttons to step through IDs, then chooses one model
+(MAN/WOM/BOY/GIRL), one of 16 visible Gildan 5000
+color swatches, a quick Small/Standard/Large print size, and an occasion
+(including Match Artwork for a background guided by the print design). It
+previews the source and saved output for the selected model and color. Artwork uses
+`artwork_<ID>` first and falls back to `artwork_<ID>_transparent`; Redesign
+uses the first image in `source/`. The Print Prompt Compiler builds the RH
+image prompt. Print Branch Gates and the lazy Print Router select the active
+Artwork or Redesign branch. Both branches use the shared Etsy Stage Save.
+
+Open [workflows/Endorphin Etsy Print.json](workflows/Endorphin%20Etsy%20Print.json)
+in ComfyUI for a wired example. Its RH Settings API key is intentionally blank.
 
 ### Legacy Etsy nodes
 **Endorphin Etsy Listing Image Loader (Legacy)**, **Endorphin Etsy Listing Save
