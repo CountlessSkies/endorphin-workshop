@@ -1,20 +1,10 @@
 import json
 
-from .etsy_color_palette import suggest_color_code
-
-
-DEFAULT_PALETTE = {
-    "selected": 0,
-    "colors": [
-        {"name": "Red", "hex": "#EF4444", "code": "RED", "value": 1},
-        {"name": "Green", "hex": "#22C55E", "code": "GRN", "value": 2},
-        {"name": "Blue", "hex": "#3B82F6", "code": "BLU", "value": 3},
-    ],
-}
+from .etsy_color_palette import DEFAULT_PALETTE, fixed_palette_data
 
 
 class EndorphinColorPalettePicker:
-    """Editable color palette with queue-time selection increment support."""
+    """Fixed apparel palette with queue-time selection increment support."""
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -22,7 +12,7 @@ class EndorphinColorPalettePicker:
             "required": {
                 "palette": ("ENDORPHIN_COLOR_PALETTE", {
                     "default": json.dumps(DEFAULT_PALETTE, separators=(",", ":")),
-                    "tooltip": "Click a swatch to select it. The selected color supplies every output.",
+                    "tooltip": "Fixed 17-colour apparel catalogue. Click a swatch to select it; HEX remains editable.",
                 }),
                 "auto_increment": ("BOOLEAN", {"default": False, "tooltip": "Advance the selected palette index for every queued batch item."}),
                 "loop": ("BOOLEAN", {"default": True, "tooltip": "When auto increment reaches the final color, return to the first color."}),
@@ -39,18 +29,16 @@ class EndorphinColorPalettePicker:
 
     def get_selected_value(self, palette, auto_increment=False, loop=True, index_value=None):
         try:
-            data = json.loads(palette) if isinstance(palette, str) else palette
-            colors = data.get("colors", [])
-            if not colors:
-                return (0, "", "", "", 0)
-            selected = int(data.get("selected", 0)) if index_value is None else int(index_value) - 1
+            data = fixed_palette_data(palette)
+            colors = data["colors"]
+            selected = int(data["selected"]) if index_value is None else int(index_value) - 1
             selected = max(0, min(selected, len(colors) - 1))
             color = colors[selected]
             return (
-                int(color.get("value", 0)),
-                str(color.get("name", "")),
+                int(color["value"]),
+                str(color["name"]),
                 str(color.get("hex", "")).upper(),
-                str(color.get("code") or suggest_color_code(color.get("name", ""))).upper(),
+                str(color["code"]).upper(),
                 selected + 1,
             )
         except (AttributeError, TypeError, ValueError, json.JSONDecodeError):

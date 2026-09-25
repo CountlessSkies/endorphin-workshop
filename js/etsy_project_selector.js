@@ -1,10 +1,14 @@
 import { app } from "../../../scripts/app.js";
 
-const DEFAULT_PALETTE = { selected: 0, colors: [
-    { name: "Red", hex: "#EF4444", code: "RED", value: 1 },
-    { name: "Green", hex: "#22C55E", code: "GRN", value: 2 },
-    { name: "Blue", hex: "#3B82F6", code: "BLU", value: 3 },
-] };
+const FIXED_COLORS = [
+    ["Military Green", "#4B5320", "MGR"], ["Carolina Blue", "#7BAFD4", "CBL"], ["Navy", "#1F2A44", "NVY"],
+    ["Black", "#000000", "BLK"], ["Sand", "#D8C3A5", "SND"], ["Grey", "#8A8A8A", "GRY"],
+    ["White", "#FFFFFF", "WHT"], ["Sport Grey", "#B7B7B7", "SGR"], ["Ash", "#D5D5D5", "ASH"],
+    ["Orange", "#E87522", "ORG"], ["Light Blue", "#9BCBEB", "LBL"], ["Forest Green", "#1F4D36", "FGR"],
+    ["Beige", "#D6C6A9", "BEI"], ["Maroon", "#7B2639", "MRN"], ["Light Pink", "#F4B6C2", "LPK"],
+    ["Brown", "#6B4423", "BRN"], ["Chocolate", "#4A2C20", "CHC"],
+];
+const DEFAULT_PALETTE = { selected: 0, colors: FIXED_COLORS.map(([name, hex, code], index) => ({ name, hex, code, value: index + 1 })) };
 const DEFAULT_PROJECT = { root_folder: "G:\\My Drive\\_Etsy\\_Listing", project_id: "RD2608001", workflow_type: "redesign", source_type: "embroidery_reference", route: "redesign_emb_candidate", candidate_letter: "", palette: DEFAULT_PALETTE, creation_period: new Date().toISOString().slice(2, 7).replace("-", "") };
 const inputCss = "box-sizing:border-box;min-width:0;width:100%;height:28px;background:#171717;color:#eee;border:1px solid #666;border-radius:3px;padding:4px 6px;font:12px sans-serif;";
 
@@ -18,8 +22,9 @@ function suggestColorCode(name) {
     const consonants = words[0].replace(/[AEIOU]/g, ""); return consonants.length >= 3 ? consonants.slice(0, 3) : words[0].slice(0, 3).padEnd(3, "X");
 }
 function normalizePalette(value) {
-    const colors = Array.isArray(value?.colors) ? value.colors : DEFAULT_PALETTE.colors;
-    const normalized = colors.map((color, index) => ({ name: String(color?.name || `Color ${index + 1}`), hex: normalizeHex(String(color?.hex || "")), code: /^[A-Z]{3}$/.test(String(color?.code || "").toUpperCase()) ? String(color.code).toUpperCase() : suggestColorCode(color?.name), code_auto: typeof color?.code_auto === "boolean" ? color.code_auto : !color?.code, value: index + 1 }));
+    const supplied = Array.isArray(value?.colors) ? value.colors : [];
+    const preserveHex = supplied.length === FIXED_COLORS.length;
+    const normalized = FIXED_COLORS.map(([name, defaultHex, code], index) => ({ name, hex: preserveHex ? normalizeHex(String(supplied[index]?.hex || defaultHex)) : defaultHex, code, value: index + 1 }));
     return { selected: Math.max(0, Math.min(Number(value?.selected) || 0, Math.max(0, normalized.length - 1))), colors: normalized };
 }
 function parsePaletteList(text) {
@@ -108,7 +113,8 @@ function createProjectSelector(node, inputName, inputData) {
     };
     const widget = node.addDOMWidget(inputName, "ENDORPHIN_ETSY_PROJECT_SELECTOR", root, { getValue: () => JSON.stringify(project), setValue: (value) => { project = parseProject(value); render(); requestAnimationFrame(resize); }, getMinHeight: contentMinHeight, getMinWidth: () => 500 });
     function resize() { const size = node.computeSize(); node.setSize([Math.max(500, node.size[0], size[0]), size[1]]); node.graph?.setDirtyCanvas(true, true); }
-    function commit() { widget.value = JSON.stringify(project); node.graph?.setDirtyCanvas(true, true); resize(); }
+    function commit(shouldResize = true) { widget.value = JSON.stringify(project); node.graph?.setDirtyCanvas(true, true); if (shouldResize) resize(); }
+    function selectPaletteColor(index) { project.palette.selected = index; root.querySelectorAll("[data-endorphin-palette-index]").forEach((row) => { const selected = Number(row.dataset.endorphinPaletteIndex) === index; row.style.borderColor = selected ? "#8ed0ff" : "#666"; row.style.background = selected ? "#29526f" : "#303030"; }); commit(false); }
     function label(text) { const element = document.createElement("div"); element.textContent = text; element.style.cssText = "margin:7px 0 3px;color:#b9c7d5;font-weight:600;"; return element; }
     function button(text, onClick, disabled = false) { const element = document.createElement("button"); element.type = "button"; element.textContent = text; element.disabled = disabled; element.style.cssText = "height:28px;padding:4px 8px;border:1px solid #666;border-radius:3px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;"; element.onclick = (event) => { event.stopPropagation(); onClick(); }; return element; }
     function cards(items, selected, setSelected) { const row = document.createElement("div"); row.style.cssText = `display:grid;grid-template-columns:repeat(${items.length},minmax(0,1fr));gap:5px;`; for (const [value, title] of items) row.append(card(title, selected === value, () => { setSelected(value); render(); commit(); })); return row; }
@@ -175,25 +181,21 @@ function createProjectSelector(node, inputName, inputData) {
     function renderPalette() {
         const section = document.createElement("div"); section.append(label("Color palette"));
         project.palette.colors.forEach((color, index) => {
-            const selected = index === project.palette.selected, row = document.createElement("div"); row.style.cssText = `box-sizing:border-box;display:grid;grid-template-columns:44px minmax(90px,1fr) 72px 48px 32px 26px 26px 34px 26px;gap:5px;align-items:center;height:38px;margin-bottom:5px;padding:3px;border:1px solid ${selected ? "#8ed0ff" : "#666"};border-radius:3px;background:${selected ? "#29526f" : "#303030"};`;
-            const swatch = button("", () => { project.palette.selected = index; commit(); render(); }); swatch.title = "Select color"; swatch.style.cssText = `height:25px;padding:0;border:1px solid #aaa;border-radius:3px;background:${color.hex};cursor:pointer;`;
-            const name = editableInput(color.name, "Color name", (value) => { color.name = value || color.name; if (color.code_auto) color.code = suggestColorCode(color.name); commit(); render(); });
+            const selected = index === project.palette.selected, row = document.createElement("div"); row.dataset.endorphinPaletteIndex = String(index); row.style.cssText = `box-sizing:border-box;display:grid;grid-template-columns:44px minmax(90px,1fr) 72px 48px 32px 34px;gap:5px;align-items:center;height:38px;margin-bottom:5px;padding:3px;border:1px solid ${selected ? "#8ed0ff" : "#666"};border-radius:3px;background:${selected ? "#29526f" : "#303030"};`;
+            const swatch = button("", () => selectPaletteColor(index)); swatch.title = "Select color"; swatch.style.cssText = `height:25px;padding:0;border:1px solid #aaa;border-radius:3px;background:${color.hex};cursor:pointer;`;
+            const name = editableInput(color.name, "Color name", () => {}); name.readOnly = true; name.title = "Fixed catalogue color name";
             const hex = editableInput(color.hex, "#RRGGBB", (value) => { if (/^#[0-9a-f]{6}$/i.test(value)) { color.hex = value.toUpperCase(); commit(); render(); } });
-            const code = editableInput(color.code, "MTP", (value) => { if (/^[A-Z]{3}$/i.test(value)) { color.code = value.toUpperCase(); color.code_auto = false; commit(); } });
+            const code = editableInput(color.code, "MTP", () => {}); code.readOnly = true; code.title = "Fixed catalogue color code";
             const numberWrap = document.createElement("div"); numberWrap.style.cssText = "height:25px;min-width:0;";
             const number = document.createElement("input"); number.type = "text"; number.readOnly = true; number.value = String(color.value); number.title = "Automatically numbered from the palette order"; number.style.cssText = "box-sizing:border-box;min-width:0;width:100%;height:25px;background:#202020;color:#bde3ff;border:1px solid #666;border-radius:5px;padding:3px 5px;text-align:center;font:12px sans-serif;"; stopCanvasEvents(number);
             numberWrap.append(number);
-            const moveUp = button("↑", () => { if (index > 0) { [project.palette.colors[index - 1], project.palette.colors[index]] = [project.palette.colors[index], project.palette.colors[index - 1]]; reindexPaletteValues(project.palette); project.palette.selected = index - 1; colorEditorIndex = null; commit(); render(); } }); moveUp.title = "Move color up"; moveUp.disabled = index === 0; moveUp.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
-            const moveDown = button("↓", () => { if (index < project.palette.colors.length - 1) { [project.palette.colors[index], project.palette.colors[index + 1]] = [project.palette.colors[index + 1], project.palette.colors[index]]; reindexPaletteValues(project.palette); project.palette.selected = index + 1; colorEditorIndex = null; commit(); render(); } }); moveDown.title = "Move color down"; moveDown.disabled = index === project.palette.colors.length - 1; moveDown.style.cssText = "height:25px;padding:0;border:1px solid #666;border-radius:5px;background:#303030;color:#d9f0ff;cursor:pointer;font:12px sans-serif;";
             const hsl = button("HSL", () => { project.palette.selected = index; colorEditorIndex = colorEditorIndex === index ? null : index; commit(); render(); }); hsl.title = "Adjust this color with HSL sliders"; hsl.style.cssText = "height:24px;padding:1px 6px;border:1px solid #5b9dcc;border-radius:12px;background:#244a63;color:#d9f0ff;cursor:pointer;font:10px sans-serif;";
-            const remove = button("×", () => { project.palette.colors.splice(index, 1); reindexPaletteValues(project.palette); project.palette.selected = Math.min(project.palette.selected, Math.max(0, project.palette.colors.length - 1)); colorEditorIndex = null; commit(); render(); }); remove.title = "Remove color"; remove.style.padding = "3px";
-            row.onclick = () => { project.palette.selected = index; commit(); render(); }; row.append(swatch, name, hex, code, numberWrap, moveUp, moveDown, hsl, remove); section.append(row); if (colorEditorIndex === index) section.append(renderHslEditor(color));
+            row.onclick = () => selectPaletteColor(index); row.append(swatch, name, hex, code, numberWrap, hsl); section.append(row); if (colorEditorIndex === index) section.append(renderHslEditor(color));
         });
         const actions = document.createElement("div"); actions.style.cssText = "display:flex;gap:6px;margin-top:2px;";
-        actions.append(button("+ Add Color", () => { const index = project.palette.colors.length + 1, name = `Color ${index}`; project.palette.colors.push({ name, hex: "#808080", code: suggestColorCode(name), code_auto: true, value: index }); project.palette.selected = project.palette.colors.length - 1; commit(); render(); }));
-        actions.append(button(paletteImporter ? "Hide Paste" : "⇩ Paste List", () => { paletteImporter = !paletteImporter; render(); requestAnimationFrame(resize); })); section.append(actions);
+        section.append(actions);
         const copy = button("⧉ Copy List", async () => { const copied = await copyText(paletteListText(project.palette)); copy.textContent = copied ? "Copied" : "Copy failed"; setTimeout(() => { copy.textContent = "⧉ Copy List"; }, 1200); }); actions.append(copy);
-        if (paletteImporter) {
+        if (false && paletteImporter) {
             const hint = document.createElement("div"); hint.textContent = "One color per line. Any format with one #RRGGBB works; optional value: | 1"; hint.style.cssText = "margin:8px 0 4px;color:#b9c7d5;";
             const textarea = document.createElement("textarea"); textarea.placeholder = "mocha taupe (hex #977D67)\n#D9DADE soft white\ncream, #E0DCC8 | 3"; textarea.style.cssText = "box-sizing:border-box;width:100%;height:110px;resize:vertical;border:1px solid #666;border-radius:3px;padding:5px;background:#171717;color:#eee;font:12px monospace;"; stopCanvasEvents(textarea);
             const error = document.createElement("div"); error.style.cssText = "min-height:16px;margin-top:3px;color:#fca5a5;";

@@ -392,8 +392,9 @@ after the workflow has been closed and reopened.
 
 ## Colorway convention
 
-**Endorphin Etsy Color Palette** remains editable: colors can be added, edited,
-deleted, and reordered for a specific listing. It is the canonical color list.
+**Endorphin Etsy Color Palette** is the fixed 17-colour apparel catalogue.
+Names, ordering, values, and colour codes are locked; only the HEX swatch may
+be adjusted for an exact supplier variant.
 
 Recommended output fields for each colorway are:
 
@@ -415,9 +416,8 @@ the generation prompt when needed.
 ### Color code and SKU handoff
 
 `color_code` is a required, stable three-letter uppercase code stored directly
-in the Etsy Color Palette row. It is an image-pipeline SKU component, unlike
-`colorway_index` (`C01`, `C02`, ...) which only describes the current palette
-order and may change when rows are reordered.
+in the fixed Etsy Color Palette row. It is an image-pipeline SKU component;
+the palette order and `colorway_index` are fixed as well.
 
 ```text
 mocha taupe  | #977D67 | MTP
@@ -425,10 +425,8 @@ soft white   | #D9DADE | SWH
 black navy   | #272A37 | BNV
 ```
 
-The picker may suggest a code deterministically from the color name; no AI is
-needed. It should take initials from up to three words and use a simple fallback
-from the word itself to reach three letters (`cream` -> `CRM`, `sand` -> `SND`).
-The operator may edit the suggestion.
+The fixed catalogue supplies each colour code directly; no automatic suggestion
+or operator code edit is used.
 
 Rules:
 
@@ -519,7 +517,7 @@ implemented yet.
 | Etsy Approve Redesign Candidate | Mark one or more fixed candidates `A/B/C...` as approved in `project.json`. It must require an explicit selection and never renumber candidates. |
 | Etsy Batch Loader | Iterate approved projects/candidates for a chosen stage; do not use it to iterate all variants in one `print` or `emb` folder. |
 | Etsy Asset Save | Receive context plus palette fields and generate the correct folder/filename automatically. |
-| Etsy Color Palette | Canonical editable colorway data, three-letter color code, and prompt override. |
+| Etsy Color Palette | Fixed 17-colour catalogue with stable three-letter codes; HEX remains editable. |
 | Folder Image Loader | Iterate multiple images already inside one `print` or `emb` folder. |
 | Subfolder Image Loader | Iterate one selected matching image per project/leaf folder; useful for project-level batch discovery, not multiple color files in the same folder. |
 

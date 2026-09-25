@@ -39,8 +39,11 @@ Loads one text value from a selected CSV column per Queue Prompt batch item. Use
 ### Endorphin Folder Image Loader
 Loads one image per Queue Prompt batch from an absolute folder path. Use **subfolder** to read a relative nested folder. Outputs the full filename and filename without extension. Sort by natural filename order, name, or modification time; turn off `auto_increment` to reuse the current image. The image index is restored after the requested queue has been submitted.
 
-### Endorphin Color Palette Picker (Legacy)
-Creates a flexible color palette directly in the node. Click a swatch to choose the active color, then edit its name, `#RRGGBB` HEX code, and integer output inline. Use **+ Add Color** to create more slots, or **Paste List** to import lines such as `mocha taupe (hex #977D67)`; add `= 10` to choose an integer other than the automatic sequence. The node resizes automatically and outputs the selected integer, color name, and HEX code.
+### Endorphin Color Palette Picker
+Uses the fixed 17-colour apparel catalogue and its stable three-letter colour
+codes. Click a swatch to choose the active colour; only its `#RRGGBB` HEX
+value may be adjusted inline or through HSL. It outputs the selected integer,
+colour name, HEX value, and colour code.
 
 ## Etsy workflow nodes
 
@@ -79,11 +82,10 @@ selected candidate in `project.json`; approval never renames candidates. The
 Approved Candidate Loader loads an approved letter for later colorway work.
 
 ### Endorphin Etsy Color Palette
-The canonical palette for new Etsy workflows. Each editable row has a color
-name, HEX value, integer value, and unique three-letter color code. Color codes
-are suggested from a name only after that name is committed (blur/change), not
-while typing; manually edited codes remain stable. It outputs `value`,
-`color_name`, `hex`, and `color_code`.
+The canonical fixed 17-colour apparel catalogue for Etsy workflows. Names,
+order, integer values, and three-letter colour codes are locked; each row's
+HEX value remains editable. It outputs `value`, `color_name`, `hex`, and
+`color_code`.
 
 ### Endorphin Etsy Stage Save
 One convention-aware PNG save node for all Etsy stages. It resolves the fixed

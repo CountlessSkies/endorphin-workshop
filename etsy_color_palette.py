@@ -2,14 +2,57 @@ import json
 import re
 
 
+# The business color catalogue is intentionally ordered and immutable. HEX is
+# user-editable because it may vary between a supplier's product variants.
+FIXED_COLORS = (
+    ("Military Green", "#4B5320", "MGR"),
+    ("Carolina Blue", "#7BAFD4", "CBL"),
+    ("Navy", "#1F2A44", "NVY"),
+    ("Black", "#000000", "BLK"),
+    ("Sand", "#D8C3A5", "SND"),
+    ("Grey", "#8A8A8A", "GRY"),
+    ("White", "#FFFFFF", "WHT"),
+    ("Sport Grey", "#B7B7B7", "SGR"),
+    ("Ash", "#D5D5D5", "ASH"),
+    ("Orange", "#E87522", "ORG"),
+    ("Light Blue", "#9BCBEB", "LBL"),
+    ("Forest Green", "#1F4D36", "FGR"),
+    ("Beige", "#D6C6A9", "BEI"),
+    ("Maroon", "#7B2639", "MRN"),
+    ("Light Pink", "#F4B6C2", "LPK"),
+    ("Brown", "#6B4423", "BRN"),
+    ("Chocolate", "#4A2C20", "CHC"),
+)
+
 DEFAULT_PALETTE = {
     "selected": 0,
     "colors": [
-        {"name": "Red", "hex": "#EF4444", "code": "RED", "value": 1},
-        {"name": "Green", "hex": "#22C55E", "code": "GRN", "value": 2},
-        {"name": "Blue", "hex": "#3B82F6", "code": "BLU", "value": 3},
+        {"name": name, "hex": hex_value, "code": code, "value": index}
+        for index, (name, hex_value, code) in enumerate(FIXED_COLORS, start=1)
     ],
 }
+
+
+def fixed_palette_data(palette):
+    """Return the fixed catalogue while retaining valid user-edited HEX values."""
+    try:
+        data = json.loads(palette) if isinstance(palette, str) else palette
+    except json.JSONDecodeError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    supplied = data.get("colors") if isinstance(data.get("colors"), list) else []
+    # A short/legacy palette is not this catalogue, so do not map its unrelated
+    # swatches onto the new colours by index.
+    preserve_hex = len(supplied) == len(FIXED_COLORS)
+    colors = []
+    for index, (name, default_hex, code) in enumerate(FIXED_COLORS):
+        candidate = supplied[index] if preserve_hex and isinstance(supplied[index], dict) else {}
+        hex_value = str(candidate.get("hex", default_hex)).strip().upper()
+        if not re.fullmatch(r"#[0-9A-F]{6}", hex_value):
+            hex_value = default_hex
+        colors.append({"name": name, "hex": hex_value, "code": code, "value": index + 1})
+    selected = max(0, min(int(data.get("selected", 0) or 0), len(colors) - 1))
+    return {"selected": selected, "colors": colors}
 
 
 def suggest_color_code(name):
@@ -33,44 +76,27 @@ def selected_color_data(palette):
         raise ValueError("Invalid Etsy color palette.") from error
     if not isinstance(data, dict):
         raise ValueError("Invalid Etsy color palette.")
-    colors = data.get("colors", [])
-    if not colors:
-        return {"colorway_index": 0, "color_name": "", "color_hex": "", "color_code": "", "prompt_color": ""}
-    seen_codes = set()
-    normalized = []
-    for index, color in enumerate(colors):
-        if not isinstance(color, dict):
-            raise ValueError(f"Palette color {index + 1} is invalid.")
-        name = str(color.get("name", "")).strip()
-        code = str(color.get("code") or suggest_color_code(name)).strip().upper()
-        hex_value = str(color.get("hex", "")).strip().upper()
-        if not re.fullmatch(r"#[0-9A-F]{6}", hex_value):
-            raise ValueError(f"HEX value for '{name or index + 1}' must use #RRGGBB.")
-        if not re.fullmatch(r"[A-Z]{3}", code):
-            raise ValueError(f"Color code for '{name or index + 1}' must be exactly three letters A-Z.")
-        if code in seen_codes:
-            raise ValueError(f"Color code '{code}' is duplicated in the palette.")
-        seen_codes.add(code)
-        normalized.append((name, hex_value, code, str(color.get("prompt_color", "")).strip()))
-    selected = max(0, min(int(data.get("selected", 0)), len(normalized) - 1))
-    name, hex_value, code, prompt_color = normalized[selected]
+    normalized = fixed_palette_data(data)
+    selected = normalized["selected"]
+    color = normalized["colors"][selected]
+    name, hex_value, code = color["name"], color["hex"], color["code"]
     return {
         "colorway_index": selected + 1,
         "color_name": name,
         "color_hex": hex_value,
         "color_code": code,
-        "prompt_color": prompt_color or f"{name} (hex {hex_value})",
+        "prompt_color": f"{name} (hex {hex_value})",
     }
 
 
 class EndorphinEtsyColorPalette:
-    """Editable Etsy color palette with a stable three-letter color code."""
+    """Fixed Etsy apparel palette with editable HEX swatches."""
 
     @classmethod
     def INPUT_TYPES(cls):
         return {"required": {"palette": ("ENDORPHIN_ETSY_COLOR_PALETTE", {
             "default": json.dumps(DEFAULT_PALETTE, separators=(",", ":")),
-            "tooltip": "The canonical Etsy colorway palette. Each code must be unique and three uppercase letters.",
+            "tooltip": "Fixed 17-colour apparel catalogue. Only HEX swatches are editable.",
         })}}
 
     RETURN_TYPES = ("INT", "STRING", "STRING", "STRING")
@@ -79,11 +105,9 @@ class EndorphinEtsyColorPalette:
     CATEGORY = "Endorphin Workshop/Etsy"
 
     def get_selected_color(self, palette):
-        data = json.loads(palette) if isinstance(palette, str) else palette
-        colors = data.get("colors", []) if isinstance(data, dict) else []
+        colors = fixed_palette_data(palette)["colors"]
         selected = selected_color_data(palette)
-        value = int(colors[selected["colorway_index"] - 1].get("value", selected["colorway_index"])) if selected["colorway_index"] else 0
-        return (value, selected["color_name"], selected["color_hex"], selected["color_code"])
+        return (selected["colorway_index"], selected["color_name"], selected["color_hex"], selected["color_code"])
 
 
 NODE_CLASS_MAPPINGS = {"EndorphinEtsyColorPalette": EndorphinEtsyColorPalette}
